@@ -109,12 +109,11 @@ docker compose exec mosquitto mosquitto_pub -h localhost -p 1883 -t climate/read
 - `POST /api/readings` recebe uma leitura manual.
 - `GET /api/readings/latest?limit=20` lista as últimas leituras.
 - `GET /api/readings/history?start=2026-04-24T00:00:00Z&end=2026-04-24T23:59:59Z&page=1&page_size=50` consulta histórico por período com paginação.
-- `GET /api/readings/alerts?start=2026-04-24T00:00:00Z&end=2026-04-24T23:59:59Z&page=1&page_size=50&alert_type=alerta` consulta alertas e críticos por período com paginação e filtro opcional por tipo.
-- `GET /api/readings/alerts/critical-hours?start=2026-04-24T00:00:00Z&end=2026-04-24T23:59:59Z&alert_type=critico` agrega ocorrências de alerta e crítico por hora para o gráfico `Horario Critico`.
+- `GET /api/readings/alerts?start=2026-04-24T00:00:00Z&end=2026-04-24T23:59:59Z&page=1&page_size=50` consulta alertas e críticos por período com paginação.
+- `GET /api/readings/alerts/critical-hours?start=2026-04-24T00:00:00Z&end=2026-04-24T23:59:59Z` agrega ocorrências de alerta e crítico por hora para o gráfico `Horario Critico`.
 - `GET /api/readings/device/{device_id}` consulta leituras por dispositivo.
 - `GET /api/readings/status` retorna o status atual do ambiente.
 - `POST /simulator/generate` gera massa histórica simulada.
-- `POST /simulator/update-until-now` gera dados simulados desde a última leitura até o momento atual.
 - `GET /health` verifica se a aplicação está ativa.
 
 ## Gerar massa histórica simulada
@@ -140,23 +139,6 @@ Perfis aceitos:
 - `mixed`: mistura dados normais, alertas e críticos.
 
 O simulador gera uma leitura a cada `frequency_seconds`, valida se `end_datetime` é maior que `start_datetime` e bloqueia chamadas com mais de 100.000 registros. As leituras são salvas em `sensor_readings`, com `air_quality_status` calculado automaticamente, e aparecem no dashboard.
-
-## Atualizar dados simulados até agora
-
-Na tela `Geral`, o botão `Atualizar dados simulados` chama:
-
-```bash
-curl -X POST http://localhost:8000/simulator/update-until-now \
-  -H "Content-Type: application/json" \
-  -d '{
-    "device_id": "esp32-sala-01",
-    "location": "Santo André - SP",
-    "frequency_seconds": 60,
-    "profile": "mixed"
-  }'
-```
-
-O endpoint busca a última leitura registrada, começa em `last_created_at + frequency_seconds` e gera registros até o momento atual. Se não houver novos dados, retorna `Nenhum dado novo para gerar`. O limite por chamada continua sendo 100.000 registros.
 
 ## Paginação dos históricos
 
@@ -219,38 +201,6 @@ Principais variáveis:
 - `MQTT_USERNAME`
 - `MQTT_PASSWORD`
 - `MQTT_ENABLED`
-- `APP_USERNAME`
-- `APP_PASSWORD`
-- `JWT_SECRET_KEY`
-
-## Autenticação
-
-A aplicação usa tela de login com JWT. Defina usuário, senha e chave JWT antes de expor o serviço:
-
-```env
-APP_USERNAME=admin
-APP_PASSWORD=troque-esta-senha
-JWT_SECRET_KEY=troque-esta-chave-secreta
-```
-
-Acesse:
-
-```text
-http://localhost:8000/login
-```
-
-Após login válido, o token JWT é salvo no `localStorage` e usado como `Bearer Token` nas chamadas da API. O token expira em 8 horas.
-
-Rotas protegidas:
-
-- `/`
-- `/dashboard`
-- `/docs`
-- `/api/readings/*`
-- `/simulator/*`
-- `/static/*`
-
-Apenas `/health`, `/login` e `/auth/login` são públicos. Sem token válido, a API retorna `401 Unauthorized` e o dashboard redireciona para `/login`.
 
 ## Rodar localmente sem Docker
 
@@ -277,5 +227,3 @@ uvicorn app.main:app --reload
 ```bash
 pytest
 ```
-
-Os testes usam SQLite e desabilitam o MQTT por variável de ambiente.
