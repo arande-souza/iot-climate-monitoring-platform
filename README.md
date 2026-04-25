@@ -219,6 +219,38 @@ Principais variáveis:
 - `MQTT_USERNAME`
 - `MQTT_PASSWORD`
 - `MQTT_ENABLED`
+- `APP_USERNAME`
+- `APP_PASSWORD`
+- `JWT_SECRET_KEY`
+
+## Autenticação
+
+A aplicação usa tela de login com JWT. Defina usuário, senha e chave JWT antes de expor o serviço:
+
+```env
+APP_USERNAME=admin
+APP_PASSWORD=troque-esta-senha
+JWT_SECRET_KEY=troque-esta-chave-secreta
+```
+
+Acesse:
+
+```text
+http://localhost:8000/login
+```
+
+Após login válido, o token JWT é salvo no `localStorage` e usado como `Bearer Token` nas chamadas da API. O token expira em 8 horas.
+
+Rotas protegidas:
+
+- `/`
+- `/dashboard`
+- `/docs`
+- `/api/readings/*`
+- `/simulator/*`
+- `/static/*`
+
+Apenas `/health`, `/login` e `/auth/login` são públicos. Sem token válido, a API retorna `401 Unauthorized` e o dashboard redireciona para `/login`.
 
 ## Rodar localmente sem Docker
 

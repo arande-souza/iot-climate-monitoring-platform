@@ -28,6 +28,7 @@ const criticalContext = criticalCanvas.getContext("2d");
 const updateSimulatedDataButton = document.getElementById("updateSimulatedData");
 const updateSimulatedDataText = document.getElementById("updateSimulatedDataText");
 const simulatorUpdateMessage = document.getElementById("simulatorUpdateMessage");
+const logoutButton = document.getElementById("logoutButton");
 let criticalHoursData = [];
 let criticalHoursHoverPoint = null;
 const simulatorUpdatePayload = {
@@ -58,6 +59,28 @@ const paginationState = {
     requestId: 0,
   },
 };
+
+function getAccessToken() {
+  return localStorage.getItem("accessToken");
+}
+
+function redirectToLogin() {
+  localStorage.removeItem("accessToken");
+  document.cookie = "access_token=; Max-Age=0; path=/";
+  window.location.href = "/login";
+}
+
+function authenticatedHeaders(extraHeaders = {}) {
+  const token = getAccessToken();
+  if (!token) {
+    redirectToLogin();
+    return extraHeaders;
+  }
+  return {
+    ...extraHeaders,
+    Authorization: `Bearer ${token}`,
+  };
+}
 
 function formatValue(value) {
   if (value === null || value === undefined) return "--";
@@ -125,8 +148,14 @@ function setStatusClass(status) {
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: authenticatedHeaders(),
+  });
   const data = await response.json().catch(() => null);
+  if (response.status === 401) {
+    redirectToLogin();
+    throw new Error("Sessao expirada");
+  }
   if (!response.ok) {
     const detail = data?.detail || `Falha ao consultar ${url}`;
     throw new Error(Array.isArray(detail) ? detail.map((item) => item.msg).join("; ") : detail);
@@ -137,12 +166,16 @@ async function fetchJson(url) {
 async function postJson(url, payload) {
   const response = await fetch(url, {
     method: "POST",
-    headers: {
+    headers: authenticatedHeaders({
       "Content-Type": "application/json",
-    },
+    }),
     body: JSON.stringify(payload),
   });
   const data = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    redirectToLogin();
+    throw new Error("Sessao expirada");
+  }
   if (!response.ok) {
     const detail = data.detail || `Falha ao chamar ${url}`;
     throw new Error(Array.isArray(detail) ? detail.map((item) => item.msg).join("; ") : detail);
@@ -150,11 +183,12 @@ async function postJson(url, payload) {
   return data;
 }
 
-function buildPeriodUrl(baseUrl, startId, endId, deviceId, pagination, alertTypeId) {
+function buildPeriodUrl(baseUrl, startId, endId, deviceId, pagination, alertTypeId, statusFilterId) {
   const start = document.getElementById(startId).value;
   const end = document.getElementById(endId).value;
   const device = document.getElementById(deviceId).value.trim();
   const alertType = alertTypeId ? document.getElementById(alertTypeId).value : "";
+  const statusFilter = statusFilterId ? document.getElementById(statusFilterId).value : "";
   const params = new URLSearchParams();
   if (start) {
     params.set("start", localInputToIso(start));
@@ -167,6 +201,9 @@ function buildPeriodUrl(baseUrl, startId, endId, deviceId, pagination, alertType
   }
   if (alertType) {
     params.set("alert_type", alertType);
+  }
+  if (statusFilter) {
+    params.set("status_filter", statusFilter);
   }
   if (pagination) {
     params.set("page", String(pagination.page));
@@ -546,6 +583,8 @@ async function loadReadingsHistory() {
     "readingsEnd",
     "readingsDevice",
     state,
+    null,
+    "readingsStatus",
   );
   const requestId = state.requestId + 1;
   state.requestId = requestId;
@@ -699,6 +738,11 @@ document.getElementById("applyReadingsFilter").addEventListener("click", () => {
   loadReadingsHistory().catch(console.error);
 });
 
+document.getElementById("readingsStatus").addEventListener("change", () => {
+  paginationState.readings.page = 1;
+  loadReadingsHistory().catch(console.error);
+});
+
 document.getElementById("applyAlertsFilter").addEventListener("click", () => {
   paginationState.alerts.page = 1;
   loadAlertsHistory().catch(console.error);
@@ -749,6 +793,10 @@ updateSimulatedDataButton.addEventListener("click", () => {
   updateSimulatedDataUntilNow().catch(console.error);
 });
 
+logoutButton.addEventListener("click", () => {
+  redirectToLogin();
+});
+
 criticalCanvas.addEventListener("mousemove", (event) => {
   if (!criticalHoursHoverPoint || !criticalHoursData.length) return;
   const rect = criticalCanvas.getBoundingClientRect();
@@ -766,6 +814,10 @@ criticalCanvas.addEventListener("mouseleave", () => {
 });
 
 async function initializeDashboard() {
+  if (!getAccessToken()) {
+    redirectToLogin();
+    return;
+  }
   await setDefaultFilters();
   refreshDashboard();
 }

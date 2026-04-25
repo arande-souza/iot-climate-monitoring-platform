@@ -3,11 +3,31 @@ from datetime import datetime, timedelta, timezone
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_iot_climate.db"
 os.environ["MQTT_ENABLED"] = "false"
+os.environ["APP_USERNAME"] = "test-user"
+os.environ["APP_PASSWORD"] = "test-password"
+os.environ["JWT_SECRET_KEY"] = "test-secret-key"
 
 from fastapi.testclient import TestClient
 
 from app.database import Base, engine
 from app.main import app
+
+
+def get_auth_headers() -> dict[str, str]:
+    with TestClient(app) as client:
+        response = client.post(
+            "/auth/login",
+            json={"username": "test-user", "password": "test-password"},
+        )
+        assert response.status_code == 200
+        token = response.json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+
+def authenticated_client() -> TestClient:
+    client = TestClient(app)
+    client.headers.update(get_auth_headers())
+    return client
 
 
 def setup_function():
@@ -32,8 +52,20 @@ def sample_payload(device_id: str = "esp32-sala-01") -> dict:
     }
 
 
-def test_create_and_list_latest_reading():
+def test_health_is_public_and_api_requires_authentication():
     with TestClient(app) as client:
+        health = client.get("/health")
+        assert health.status_code == 200
+
+        protected = client.get("/api/readings/latest")
+        assert protected.status_code == 401
+
+        authenticated = client.get("/api/readings/latest", headers=get_auth_headers())
+        assert authenticated.status_code == 200
+
+
+def test_create_and_list_latest_reading():
+    with authenticated_client() as client:
         response = client.post("/api/readings", json=sample_payload())
         assert response.status_code == 201
         created = response.json()
@@ -46,7 +78,7 @@ def test_create_and_list_latest_reading():
 
 
 def test_rejects_invalid_payload():
-    with TestClient(app) as client:
+    with authenticated_client() as client:
         payload = sample_payload()
         payload["temperature"] = None
         response = client.post("/api/readings", json=payload)
@@ -59,7 +91,7 @@ def test_rejects_invalid_payload():
 
 
 def test_filter_by_device_id():
-    with TestClient(app) as client:
+    with authenticated_client() as client:
         client.post("/api/readings", json=sample_payload("esp32-sala-01"))
         client.post("/api/readings", json=sample_payload("esp32-lab-02"))
 
@@ -71,7 +103,7 @@ def test_filter_by_device_id():
 
 
 def test_history_by_period_and_environment_status():
-    with TestClient(app) as client:
+    with authenticated_client() as client:
         client.post("/api/readings", json=sample_payload())
 
         start = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
@@ -88,7 +120,7 @@ def test_history_by_period_and_environment_status():
 
 
 def test_history_can_return_all_readings_and_date_range():
-    with TestClient(app) as client:
+    with authenticated_client() as client:
         client.post("/api/readings", json=sample_payload("esp32-sala-01"))
         client.post("/api/readings", json=sample_payload("esp32-lab-02"))
 
@@ -108,7 +140,7 @@ def test_history_can_return_all_readings_and_date_range():
 
 
 def test_history_pagination_accepts_expected_page_sizes():
-    with TestClient(app) as client:
+    with authenticated_client() as client:
         for index in range(55):
             client.post("/api/readings", json=sample_payload(f"esp32-{index:02d}"))
 
@@ -131,8 +163,23 @@ def test_history_pagination_accepts_expected_page_sizes():
         assert response.status_code == 422
 
 
+def test_history_filters_by_status():
+    with authenticated_client() as client:
+        client.post("/api/readings", json=sample_payload("esp32-ideal-01"))
+
+        alert_payload = sample_payload("esp32-alerta-01")
+        alert_payload["temperature"] = 29.2
+        client.post("/api/readings", json=alert_payload)
+
+        response = client.get("/api/readings/history?status_filter=alerta")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["items"][0]["air_quality_status"] == "alerta"
+
+
 def test_alert_history_returns_only_alert_and_critical_readings():
-    with TestClient(app) as client:
+    with authenticated_client() as client:
         client.post("/api/readings", json=sample_payload())
 
         alert_payload = sample_payload("esp32-alerta-01")
@@ -178,7 +225,7 @@ def test_alert_history_returns_only_alert_and_critical_readings():
 
 
 def test_simulator_generate_creates_historical_readings():
-    with TestClient(app) as client:
+    with authenticated_client() as client:
         payload = {
             "device_id": "esp32-sala-01",
             "location": "Santo André - SP",
@@ -201,7 +248,7 @@ def test_simulator_generate_creates_historical_readings():
 
 
 def test_simulator_validates_date_range_frequency_and_limit():
-    with TestClient(app) as client:
+    with authenticated_client() as client:
         payload = {
             "device_id": "esp32-sala-01",
             "location": "Santo André - SP",
@@ -223,7 +270,7 @@ def test_simulator_validates_date_range_frequency_and_limit():
 
 
 def test_simulator_update_until_now_generates_from_last_reading():
-    with TestClient(app) as client:
+    with authenticated_client() as client:
         payload = sample_payload()
         client.post("/api/readings", json=payload)
 
@@ -244,7 +291,7 @@ def test_simulator_update_until_now_generates_from_last_reading():
 
 
 def test_simulator_update_until_now_returns_no_data_when_current():
-    with TestClient(app) as client:
+    with authenticated_client() as client:
         response = client.post(
             "/simulator/generate",
             json={

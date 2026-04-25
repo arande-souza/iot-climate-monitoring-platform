@@ -23,6 +23,8 @@ from app.services.classification_service import (
 router = APIRouter(prefix="/api/readings", tags=["sensor readings"])
 ALLOWED_PAGE_SIZES = {20, 50, 100, 200, 500, 1000}
 ALERT_STATUS_VALUES = {
+    "ideal": ("ideal", "normal"),
+    "aceitavel": ("aceitavel", "acceptable"),
     "alerta": ("alerta", "alert"),
     "critico": ("critico", "critical"),
 }
@@ -80,6 +82,17 @@ def get_alert_status_filter(alert_type: str | None) -> tuple[str, ...]:
     return ALERT_STATUS_VALUES[alert_type]
 
 
+def get_reading_status_filter(reading_status: str | None) -> tuple[str, ...] | None:
+    if reading_status is None or reading_status == "":
+        return None
+    if reading_status not in ALERT_STATUS_VALUES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="status_filter deve ser ideal, aceitavel, alerta ou critico",
+        )
+    return ALERT_STATUS_VALUES[reading_status]
+
+
 @router.post(
     "",
     response_model=SensorReadingResponse,
@@ -103,6 +116,10 @@ def get_history(
     start: datetime | None = Query(default=None, description="Data inicial em ISO 8601"),
     end: datetime | None = Query(default=None, description="Data final em ISO 8601"),
     device_id: str | None = Query(default=None),
+    status_filter: str | None = Query(
+        default=None,
+        description="Status da leitura: ideal, aceitavel, alerta ou critico",
+    ),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50),
     db: Session = Depends(get_db),
@@ -120,6 +137,9 @@ def get_history(
         conditions.append(SensorReading.created_at <= end)
     if device_id:
         conditions.append(SensorReading.device_id == device_id)
+    status_values = get_reading_status_filter(status_filter)
+    if status_values:
+        conditions.append(SensorReading.air_quality_status.in_(status_values))
 
     stmt = select(SensorReading).where(*conditions).order_by(SensorReading.created_at.asc())
     count_stmt = select(func.count()).select_from(SensorReading).where(*conditions)

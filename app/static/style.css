@@ -1,4 +1,5 @@
 :root {
+  --sidebar-width: 260px;
   color-scheme: light;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #eef2f6;
@@ -12,6 +13,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 button,
@@ -21,15 +23,22 @@ select {
 }
 
 .app-shell {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  display: block;
   min-height: 100vh;
 }
 
 .sidebar {
   background: #102033;
   color: #fff;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  left: 0;
   padding: 22px 16px;
+  position: fixed;
+  top: 0;
+  width: var(--sidebar-width);
+  z-index: 20;
 }
 
 .brand {
@@ -85,11 +94,14 @@ select {
 }
 
 .content-shell {
+  height: 100vh;
+  margin-left: var(--sidebar-width);
   min-width: 0;
+  overflow-y: auto;
 }
 
 .topbar {
-  align-items: center;
+  align-items: flex-end;
   background: #fff;
   border-bottom: 1px solid #dfe6ef;
   display: flex;
@@ -112,6 +124,35 @@ select {
 
 .timestamp {
   white-space: nowrap;
+}
+
+.topbar-actions {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+}
+
+.sidebar-footer {
+  border-top: 1px solid rgba(203, 215, 229, 0.18);
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+#logoutButton {
+  background: #0f766e;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 40px;
+  padding: 9px 12px;
+  text-align: center;
+  width: 100%;
+}
+
+#logoutButton:hover {
+  background: #115e59;
 }
 
 .layout {
@@ -389,6 +430,7 @@ select {
 
 .nav-item:focus-visible,
 #updateSimulatedData:focus-visible,
+#logoutButton:focus-visible,
 .filter-panel button:focus-visible,
 .pagination-bar button:focus-visible,
 .filter-panel input:focus-visible,
@@ -475,12 +517,25 @@ td {
 }
 
 @media (max-width: 920px) {
+  body {
+    overflow: auto;
+  }
+
   .app-shell {
-    grid-template-columns: 1fr;
+    display: block;
   }
 
   .sidebar {
+    height: auto;
+    min-height: auto;
     position: static;
+    width: auto;
+  }
+
+  .content-shell {
+    height: auto;
+    margin-left: 0;
+    overflow-y: visible;
   }
 
   .nav-menu {
@@ -491,7 +546,12 @@ td {
     text-align: center;
   }
 
+  .sidebar-footer {
+    margin-top: 18px;
+  }
+
   .topbar,
+  .topbar-actions,
   .status-band,
   .action-bar {
     align-items: flex-start;

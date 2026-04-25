@@ -21,6 +21,9 @@
           <button class="nav-item" type="button" data-view="readingsView">Historico Leituras</button>
           <button class="nav-item" type="button" data-view="alertsView">Historico Alertas</button>
         </nav>
+        <div class="sidebar-footer">
+          <button id="logoutButton" type="button">Sair</button>
+        </div>
       </aside>
 
       <div class="content-shell">
@@ -29,7 +32,9 @@
             <h1 id="pageTitle">Geral</h1>
             <p id="pageSubtitle">Status atual e leituras recentes dos sensores IoT</p>
           </div>
-          <span id="updatedAt" class="timestamp">Atualizando...</span>
+          <div class="topbar-actions">
+            <span id="updatedAt" class="timestamp">Atualizando...</span>
+          </div>
         </header>
 
         <main class="layout">
@@ -125,6 +130,16 @@
               <label>
                 Dispositivo
                 <input id="readingsDevice" type="text" placeholder="Todos" />
+              </label>
+              <label>
+                Status
+                <select id="readingsStatus" aria-label="Status da leitura">
+                  <option value="">Todos</option>
+                  <option value="ideal">Ideal</option>
+                  <option value="aceitavel">Aceitavel</option>
+                  <option value="alerta">Alerta</option>
+                  <option value="critico">Critico</option>
+                </select>
               </label>
               <button id="applyReadingsFilter" type="button">Filtrar</button>
             </section>
