@@ -1,22 +1,120 @@
-# Sistema de Monitoramento Climático para Otimização de Ambientes Tecnológicos
+# 🌡️ IoT Climate Monitoring Platform
 
-Aplicação acadêmica em Python para monitorar variáveis ambientais coletadas por sensores IoT, simulando a arquitetura:
+Sistema de monitoramento climático em tempo real para ambientes tecnológicos, utilizando IoT, mensageria MQTT e análise de dados para apoiar decisões relacionadas à climatização, conforto e qualidade do ar.
 
-`Sensores -> ESP32 -> MQTT Broker -> Ingestor Python -> PostgreSQL -> API/Dashboard`
+A nossa solução é reponsável por coletar, processar e analisar variáveis ambientais como temperatura, umidade, CO₂ e material particulado, fornecendo métricas, alertas e visualizações históricas.
 
-O projeto usa FastAPI, PostgreSQL, SQLAlchemy, Pydantic, paho-mqtt, Docker Compose e Mosquitto.
+Arquitetura:
 
-## Funcionalidades
+Sensores → ESP32 → MQTT → Backend (FastAPI) → PostgreSQL → Dashboard
 
-- API REST para cadastrar e consultar leituras ambientais.
-- Ingestão MQTT no tópico configurável `climate/readings`.
-- Classificação automática do ambiente: `ideal`, `aceitavel`, `alerta` ou `critico`.
-- Dashboard web simples com métricas atuais, status geral, últimas leituras e gráfico histórico.
-- Menu lateral com telas de visão geral, histórico de leituras e histórico de alertas.
-- Script de seed para popular dados fictícios.
-- Testes básicos dos endpoints principais.
+---
 
-## Estrutura
+## 🎯 Objetivo do Projeto
+
+A solução tem como objetivo:
+
+- Monitorar condições ambientais em tempo real
+- Melhorar o conforto térmico dos colaboradores
+- Reduzir riscos operacionais em equipamentos
+- Apoiar decisões baseadas em dados
+- Identificar padrões e anomalias ambientais
+
+---
+
+## 🏗️ Arquitetura do Sistema
+
+O sistema segue uma arquitetura baseada em eventos e ingestão de dados em tempo real:
+
+- ESP32 realiza leitura dos sensores
+- Dados são enviados via MQTT
+- Backend Python consome e processa as mensagens
+- Dados são persistidos no PostgreSQL
+- Dashboard apresenta dados em tempo real e históricos
+
+**Frequência de coleta:**
+- 1 leitura a cada **60 segundos**
+- Justificativa: equilíbrio entre monitoramento em tempo real e volume de dados
+
+---
+
+## ⚙️ Tecnologias Utilizadas
+
+- Python
+- FastAPI
+- PostgreSQL
+- SQLAlchemy
+- Pydantic
+- MQTT (Mosquitto)
+- Docker / Docker Compose
+
+---
+
+## 🚀 Funcionalidades
+
+- API REST para ingestão e consulta de dados ambientais
+- Consumo de dados via MQTT
+- Classificação automática do ambiente:
+  - ideal
+  - aceitável
+  - alerta
+  - crítico
+- Dashboard web com:
+  - métricas em tempo real
+  - histórico de leituras
+  - histórico de alertas
+  - gráfico temporal
+- Simulador de dados ambientais
+- Paginação de históricos
+- Testes automatizados
+
+---
+
+## 📊 Métricas e Indicadores
+
+O sistema fornece indicadores para análise ambiental:
+
+- Índice de Qualidade do Ambiente (score)
+- Histórico de leituras
+- Histórico de alertas
+- Percentual de tempo em alerta
+- Tempo total em estado crítico
+- Médias diárias de variáveis ambientais
+
+Essas métricas permitem identificar padrões, tendências e problemas operacionais.
+
+---
+
+## 📦 Volume de Dados
+
+Com frequência de 60 segundos:
+
+- ~1.440 registros por dia por dispositivo
+- ~43.200 registros por mês
+- ~525.000 registros por ano
+
+O sistema foi projetado para suportar esse volume de forma eficiente.
+
+---
+
+## 🧪 Simulação de Dados
+
+O sistema possui um gerador de dados simulados para testes e análise:
+
+- Geração de massa histórica configurável
+- Frequência de coleta parametrizável
+- Perfis de dados:
+  - normal
+  - alert
+  - critical
+  - mixed
+- Baseado em parâmetros climáticos realistas de Santo André - SP
+
+Isso permite testar cenários reais sem necessidade de hardware físico.
+
+---
+
+## 📁 Estrutura do Projeto
 
 ```text
 iot-climate-monitoring-platform/
@@ -37,213 +135,3 @@ iot-climate-monitoring-platform/
 ├── requirements.txt
 ├── .env.example
 └── README.md
-```
-
-## Como rodar com Docker
-
-```bash
-docker compose up --build
-```
-
-Serviços expostos:
-
-- Dashboard: http://localhost:8000
-- API docs: http://localhost:8000/docs
-- PostgreSQL: `localhost:5432`
-- Mosquitto MQTT: `localhost:1883`
-
-As tabelas são criadas automaticamente na inicialização da aplicação.
-
-## Popular dados fictícios
-
-Com os containers rodando:
-
-```bash
-docker compose exec app python scripts/seed_data.py
-```
-
-Depois acesse o dashboard em http://localhost:8000.
-
-## Exemplo de envio via API
-
-```bash
-curl -X POST http://localhost:8000/api/readings \
-  -H "Content-Type: application/json" \
-  -d '{
-    "device_id": "esp32-sala-01",
-    "location": "Sala de TI",
-    "temperature": 23.5,
-    "humidity": 48.2,
-    "pressure": 1012.4,
-    "co2": 750,
-    "pm25": 8.5,
-    "pm10": 18.3
-  }'
-```
-
-## Exemplo de publicação MQTT
-
-Com `mosquitto_pub` instalado localmente:
-
-```bash
-mosquitto_pub -h localhost -p 1883 -t climate/readings -m '{
-  "device_id": "esp32-sala-01",
-  "location": "Sala de TI",
-  "temperature": 23.5,
-  "humidity": 48.2,
-  "pressure": 1012.4,
-  "co2": 750,
-  "pm25": 8.5,
-  "pm10": 18.3
-}'
-```
-
-Também é possível publicar de dentro do container do broker, caso o cliente esteja disponível na imagem:
-
-```bash
-docker compose exec mosquitto mosquitto_pub -h localhost -p 1883 -t climate/readings -m '{"device_id":"esp32-sala-01","location":"Sala de TI","temperature":23.5,"humidity":48.2,"pressure":1012.4,"co2":750,"pm25":8.5,"pm10":18.3}'
-```
-
-## Endpoints principais
-
-- `POST /api/readings` recebe uma leitura manual.
-- `GET /api/readings/latest?limit=20` lista as últimas leituras.
-- `GET /api/readings/history?start=2026-04-24T00:00:00Z&end=2026-04-24T23:59:59Z&page=1&page_size=50` consulta histórico por período com paginação.
-- `GET /api/readings/alerts?start=2026-04-24T00:00:00Z&end=2026-04-24T23:59:59Z&page=1&page_size=50&alert_type=alerta` consulta alertas e críticos por período com paginação e filtro opcional por tipo.
-- `GET /api/readings/alerts/critical-hours?start=2026-04-24T00:00:00Z&end=2026-04-24T23:59:59Z&alert_type=critico` agrega ocorrências de alerta e crítico por hora para o gráfico `Horario Critico`.
-- `GET /api/readings/device/{device_id}` consulta leituras por dispositivo.
-- `GET /api/readings/status` retorna o status atual do ambiente.
-- `POST /simulator/generate` gera massa histórica simulada.
-- `POST /simulator/update-until-now` gera dados simulados desde a última leitura até o momento atual.
-- `GET /health` verifica se a aplicação está ativa.
-
-## Gerar massa histórica simulada
-
-```bash
-curl -X POST http://localhost:8000/simulator/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "device_id": "esp32-sala-01",
-    "location": "Santo André - SP",
-    "start_datetime": "2026-03-16T08:00:00",
-    "end_datetime": "2026-03-16T18:00:00",
-    "frequency_seconds": 60,
-    "profile": "mixed"
-  }'
-```
-
-Perfis aceitos:
-
-- `normal`: leituras concentradas nas faixas ideais.
-- `alert`: algumas leituras fora das faixas aceitáveis.
-- `critical`: maior chance de CO₂ e PM2.5 críticos.
-- `mixed`: mistura dados normais, alertas e críticos.
-
-O simulador gera uma leitura a cada `frequency_seconds`, valida se `end_datetime` é maior que `start_datetime` e bloqueia chamadas com mais de 100.000 registros. As leituras são salvas em `sensor_readings`, com `air_quality_status` calculado automaticamente, e aparecem no dashboard.
-
-## Atualizar dados simulados até agora
-
-Na tela `Geral`, o botão `Atualizar dados simulados` chama:
-
-```bash
-curl -X POST http://localhost:8000/simulator/update-until-now \
-  -H "Content-Type: application/json" \
-  -d '{
-    "device_id": "esp32-sala-01",
-    "location": "Santo André - SP",
-    "frequency_seconds": 60,
-    "profile": "mixed"
-  }'
-```
-
-O endpoint busca a última leitura registrada, começa em `last_created_at + frequency_seconds` e gera registros até o momento atual. Se não houver novos dados, retorna `Nenhum dado novo para gerar`. O limite por chamada continua sendo 100.000 registros.
-
-## Paginação dos históricos
-
-As telas `Historico Leituras` e `Historico Alertas` possuem paginação com seletor `Exibir`.
-
-Opções disponíveis:
-
-- 20 registros por página
-- 50 registros por página
-- 100 registros por página
-- 200 registros por página
-- 500 registros por página
-- 1000 registros por página
-
-O valor padrão é `50`. Ao alterar o seletor, a tabela recarrega automaticamente e volta para a página 1.
-
-## Regras de classificação
-
-Temperatura:
-
-- Ideal: 22°C a 24°C
-- Aceitável: 20°C a 26°C
-- Alerta: abaixo de 20°C ou acima de 26°C
-
-Umidade:
-
-- Ideal: 40% a 60%
-- Aceitável: 30% a 65%
-- Alerta: abaixo de 30% ou acima de 65%
-
-CO₂:
-
-- Ideal: até 800 ppm
-- Aceitável: até 1000 ppm
-- Alerta: acima de 1000 ppm
-- Crítico: acima de 1500 ppm
-
-PM2.5:
-
-- Ideal: abaixo de 12 µg/m³
-- Alerta: 12 a 35 µg/m³
-- Crítico: acima de 35 µg/m³
-
-O status geral usa a pior classificação entre temperatura, umidade, CO₂ e PM2.5.
-
-## Variáveis de ambiente
-
-Copie `.env.example` para `.env` se quiser rodar localmente sem Docker:
-
-```bash
-cp .env.example .env
-```
-
-Principais variáveis:
-
-- `DATABASE_URL`
-- `MQTT_HOST`
-- `MQTT_PORT`
-- `MQTT_TOPIC`
-- `MQTT_USERNAME`
-- `MQTT_PASSWORD`
-- `MQTT_ENABLED`
-
-## Rodar localmente sem Docker
-
-É necessário ter PostgreSQL e Mosquitto disponíveis.
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-No Windows PowerShell:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-## Testes
-
-```bash
-pytest
-```
-
-Os testes usam SQLite e desabilitam o MQTT por variável de ambiente.
