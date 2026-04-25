@@ -54,14 +54,6 @@ Serviços expostos:
 
 As tabelas são criadas automaticamente na inicialização da aplicação.
 
-## Popular dados fictícios
-
-Com os containers rodando:
-
-```bash
-docker compose exec app python scripts/seed_data.py
-```
-
 Depois acesse o dashboard em http://localhost:8000.
 
 ## Exemplo de envio via API
@@ -98,12 +90,6 @@ mosquitto_pub -h localhost -p 1883 -t climate/readings -m '{
 }'
 ```
 
-Também é possível publicar de dentro do container do broker, caso o cliente esteja disponível na imagem:
-
-```bash
-docker compose exec mosquitto mosquitto_pub -h localhost -p 1883 -t climate/readings -m '{"device_id":"esp32-sala-01","location":"Sala de TI","temperature":23.5,"humidity":48.2,"pressure":1012.4,"co2":750,"pm25":8.5,"pm10":18.3}'
-```
-
 ## Endpoints principais
 
 - `POST /api/readings` recebe uma leitura manual.
@@ -116,20 +102,6 @@ docker compose exec mosquitto mosquitto_pub -h localhost -p 1883 -t climate/read
 - `POST /simulator/generate` gera massa histórica simulada.
 - `GET /health` verifica se a aplicação está ativa.
 
-## Gerar massa histórica simulada
-
-```bash
-curl -X POST http://localhost:8000/simulator/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "device_id": "esp32-sala-01",
-    "location": "Santo André - SP",
-    "start_datetime": "2026-03-16T08:00:00",
-    "end_datetime": "2026-03-16T18:00:00",
-    "frequency_seconds": 60,
-    "profile": "mixed"
-  }'
-```
 
 Perfis aceitos:
 
