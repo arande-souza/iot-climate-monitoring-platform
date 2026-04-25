@@ -13,6 +13,7 @@ from app.schemas.sensor_reading_schema import (
     SensorReadingCreate,
     SensorReadingResponse,
     ReadingsDateRange,
+    ReadingsSummary,
 )
 from app.services.classification_service import (
     build_recommendations,
@@ -21,6 +22,10 @@ from app.services.classification_service import (
 
 router = APIRouter(prefix="/api/readings", tags=["sensor readings"])
 ALLOWED_PAGE_SIZES = {20, 50, 100, 200, 500, 1000}
+ALERT_STATUS_VALUES = {
+    "alerta": ("alerta", "alert"),
+    "critico": ("critico", "critical"),
+}
 
 
 def create_sensor_reading(db: Session, payload: SensorReadingCreate) -> SensorReading:
@@ -62,6 +67,17 @@ def paginate_readings(
         page_size=page_size,
         total_pages=total_pages,
     )
+
+
+def get_alert_status_filter(alert_type: str | None) -> tuple[str, ...]:
+    if alert_type is None or alert_type == "":
+        return ("alerta", "critico", "alert", "critical")
+    if alert_type not in ALERT_STATUS_VALUES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="alert_type deve ser alerta ou critico",
+        )
+    return ALERT_STATUS_VALUES[alert_type]
 
 
 @router.post(
@@ -129,11 +145,18 @@ def get_readings_date_range(
     )
 
 
+@router.get("/summary", response_model=ReadingsSummary)
+def get_readings_summary(db: Session = Depends(get_db)):
+    total_readings = db.scalar(select(func.count()).select_from(SensorReading)) or 0
+    return ReadingsSummary(total_readings=total_readings)
+
+
 @router.get("/alerts", response_model=PaginatedSensorReadings)
 def get_alert_history(
     start: datetime | None = Query(default=None, description="Data inicial em ISO 8601"),
     end: datetime | None = Query(default=None, description="Data final em ISO 8601"),
     device_id: str | None = Query(default=None),
+    alert_type: str | None = Query(default=None, description="Tipo do alerta: alerta ou critico"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50),
     db: Session = Depends(get_db),
@@ -145,7 +168,7 @@ def get_alert_history(
         )
 
     conditions = [
-        SensorReading.air_quality_status.in_(("alerta", "critico", "alert", "critical")),
+        SensorReading.air_quality_status.in_(get_alert_status_filter(alert_type)),
     ]
     if start:
         conditions.append(SensorReading.created_at >= start)
@@ -164,6 +187,7 @@ def get_critical_hours(
     start: datetime | None = Query(default=None, description="Data inicial em ISO 8601"),
     end: datetime | None = Query(default=None, description="Data final em ISO 8601"),
     device_id: str | None = Query(default=None),
+    alert_type: str | None = Query(default=None, description="Tipo do alerta: alerta ou critico"),
     db: Session = Depends(get_db),
 ):
     if start and end and start > end:
@@ -173,7 +197,7 @@ def get_critical_hours(
         )
 
     conditions = [
-        SensorReading.air_quality_status.in_(("alerta", "critico", "alert", "critical")),
+        SensorReading.air_quality_status.in_(get_alert_status_filter(alert_type)),
     ]
     if start:
         conditions.append(SensorReading.created_at >= start)
@@ -182,7 +206,11 @@ def get_critical_hours(
     if device_id:
         conditions.append(SensorReading.device_id == device_id)
 
-    hour_expr = extract("hour", SensorReading.created_at).label("hour")
+    if db.bind and db.bind.dialect.name == "postgresql":
+        chart_datetime = func.timezone("America/Sao_Paulo", SensorReading.created_at)
+    else:
+        chart_datetime = SensorReading.created_at
+    hour_expr = extract("hour", chart_datetime).label("hour")
     stmt = (
         select(
             hour_expr,

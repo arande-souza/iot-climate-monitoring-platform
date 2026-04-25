@@ -131,40 +131,109 @@ select {
 
 .metrics-grid {
   display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .metric,
 .chart-section,
 .table-section,
-.filter-panel {
+.filter-panel,
+.action-bar {
   background: #fff;
   border: 1px solid #dfe6ef;
   border-radius: 8px;
   box-shadow: 0 10px 24px rgba(16, 32, 51, 0.05);
 }
 
+.action-bar {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 16px 18px;
+}
+
+.action-bar strong,
+#simulatorUpdateMessage {
+  display: block;
+}
+
+.action-bar strong {
+  margin-bottom: 4px;
+}
+
+#simulatorUpdateMessage {
+  color: #526173;
+  font-size: 0.94rem;
+}
+
+#updateSimulatedData {
+  align-items: center;
+  background: #0f766e;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 16px;
+  white-space: nowrap;
+}
+
+#updateSimulatedData span {
+  color: #fff;
+}
+
+#updateSimulatedData:hover {
+  background: #115e59;
+}
+
+#updateSimulatedData:disabled {
+  background: #94a3b8;
+  cursor: wait;
+}
+
+#updateSimulatedData.is-loading .refresh-icon {
+  animation: spin 0.9s linear infinite;
+}
+
+#simulatorUpdateMessage.success {
+  color: #15803d;
+}
+
+#simulatorUpdateMessage.error {
+  color: #b91c1c;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .metric {
-  min-height: 132px;
-  padding: 18px;
+  min-height: 108px;
+  padding: 14px;
 }
 
 .metric-label {
   color: #5b6a7d;
   display: block;
-  font-size: 0.95rem;
-  margin-bottom: 12px;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
 }
 
 .metric strong {
-  font-size: 2.25rem;
+  font-size: clamp(1.45rem, 2.3vw, 1.95rem);
   line-height: 1;
+  overflow-wrap: anywhere;
 }
 
 .metric small {
   color: #5b6a7d;
-  font-size: 1rem;
+  font-size: 0.86rem;
 }
 
 .status-band {
@@ -233,7 +302,7 @@ select {
   align-items: end;
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(3, minmax(180px, 1fr)) auto;
+  grid-template-columns: repeat(4, minmax(150px, 1fr)) auto;
   padding: 16px;
 }
 
@@ -319,6 +388,7 @@ select {
 }
 
 .nav-item:focus-visible,
+#updateSimulatedData:focus-visible,
 .filter-panel button:focus-visible,
 .pagination-bar button:focus-visible,
 .filter-panel input:focus-visible,
@@ -333,6 +403,10 @@ select {
   display: block;
   height: 260px;
   width: 100%;
+}
+
+#criticalHoursChart {
+  cursor: crosshair;
 }
 
 h2 {
@@ -418,7 +492,8 @@ td {
   }
 
   .topbar,
-  .status-band {
+  .status-band,
+  .action-bar {
     align-items: flex-start;
     flex-direction: column;
   }

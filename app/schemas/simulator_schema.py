@@ -31,3 +31,24 @@ class SimulatorGenerateResponse(BaseModel):
     device_id: str
     location: str
     profile: SimulatorProfile
+
+
+class SimulatorUpdateUntilNowRequest(BaseModel):
+    device_id: str = Field(..., min_length=1, max_length=80)
+    location: str = Field(..., min_length=1, max_length=120)
+    frequency_seconds: int = Field(default=60, gt=0)
+    profile: SimulatorProfile = "mixed"
+
+    @field_validator("frequency_seconds", mode="before")
+    @classmethod
+    def reject_invalid_frequency_type(cls, value):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError("frequency_seconds deve ser um inteiro maior que zero")
+        return value
+
+
+class SimulatorUpdateUntilNowResponse(BaseModel):
+    message: str
+    start_datetime: datetime | None = None
+    end_datetime: datetime | None = None
+    total_generated: int = 0

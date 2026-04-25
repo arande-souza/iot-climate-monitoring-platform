@@ -1,6 +1,9 @@
 const numberFormat = new Intl.NumberFormat("pt-BR", {
   maximumFractionDigits: 1,
 });
+const integerFormat = new Intl.NumberFormat("pt-BR", {
+  maximumFractionDigits: 0,
+});
 
 const views = {
   generalView: {
@@ -22,6 +25,21 @@ const chartCanvas = document.getElementById("historyChart");
 const chartContext = chartCanvas.getContext("2d");
 const criticalCanvas = document.getElementById("criticalHoursChart");
 const criticalContext = criticalCanvas.getContext("2d");
+const updateSimulatedDataButton = document.getElementById("updateSimulatedData");
+const updateSimulatedDataText = document.getElementById("updateSimulatedDataText");
+const simulatorUpdateMessage = document.getElementById("simulatorUpdateMessage");
+let criticalHoursData = [];
+let criticalHoursHoverPoint = null;
+const simulatorUpdatePayload = {
+  device_id: "esp32-sala-01",
+  location: "Santo André - SP",
+  frequency_seconds: 60,
+  profile: "mixed",
+};
+const SIMULATOR_DEFAULT_MESSAGE = "Area de atualização manual";
+let simulatorMessageResetTimeout;
+const DASHBOARD_TIME_ZONE = "America/Sao_Paulo";
+const DASHBOARD_TIME_ZONE_OFFSET = "-03:00";
 const paginationState = {
   readings: {
     page: 1,
@@ -29,7 +47,7 @@ const paginationState = {
     total: 0,
     totalPages: 1,
     isLoading: false,
-    lastRequestKey: "",
+    requestId: 0,
   },
   alerts: {
     page: 1,
@@ -37,7 +55,7 @@ const paginationState = {
     total: 0,
     totalPages: 1,
     isLoading: false,
-    lastRequestKey: "",
+    requestId: 0,
   },
 };
 
@@ -50,16 +68,28 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "medium",
+    timeZone: DASHBOARD_TIME_ZONE,
   }).format(new Date(value));
 }
 
 function formatDateTimeLocal(date) {
-  const offsetMs = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: DASHBOARD_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`;
 }
 
 function localInputToIso(value) {
-  return value;
+  if (!value) return value;
+  return `${value}:00${DASHBOARD_TIME_ZONE_OFFSET}`;
 }
 
 function getDefaultPeriod() {
@@ -96,16 +126,35 @@ function setStatusClass(status) {
 
 async function fetchJson(url) {
   const response = await fetch(url);
+  const data = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(`Falha ao consultar ${url}`);
+    const detail = data?.detail || `Falha ao consultar ${url}`;
+    throw new Error(Array.isArray(detail) ? detail.map((item) => item.msg).join("; ") : detail);
   }
-  return response.json();
+  return data;
 }
 
-function buildPeriodUrl(baseUrl, startId, endId, deviceId, pagination) {
+async function postJson(url, payload) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = data.detail || `Falha ao chamar ${url}`;
+    throw new Error(Array.isArray(detail) ? detail.map((item) => item.msg).join("; ") : detail);
+  }
+  return data;
+}
+
+function buildPeriodUrl(baseUrl, startId, endId, deviceId, pagination, alertTypeId) {
   const start = document.getElementById(startId).value;
   const end = document.getElementById(endId).value;
   const device = document.getElementById(deviceId).value.trim();
+  const alertType = alertTypeId ? document.getElementById(alertTypeId).value : "";
   const params = new URLSearchParams();
   if (start) {
     params.set("start", localInputToIso(start));
@@ -116,11 +165,24 @@ function buildPeriodUrl(baseUrl, startId, endId, deviceId, pagination) {
   if (device) {
     params.set("device_id", device);
   }
+  if (alertType) {
+    params.set("alert_type", alertType);
+  }
   if (pagination) {
     params.set("page", String(pagination.page));
     params.set("page_size", String(pagination.pageSize));
   }
   return `${baseUrl}?${params.toString()}`;
+}
+
+function validateDateRange(startId, endId) {
+  const start = document.getElementById(startId).value;
+  const end = document.getElementById(endId).value;
+  if (!start || !end) return;
+
+  if (new Date(localInputToIso(start)) > new Date(localInputToIso(end))) {
+    throw new Error("A data inicial deve ser anterior ou igual a data final.");
+  }
 }
 
 function updateMetrics(statusPayload) {
@@ -136,6 +198,11 @@ function updateMetrics(statusPayload) {
   document.getElementById("co2").textContent = formatValue(reading.co2);
   document.getElementById("pm25").textContent = formatValue(reading.pm25);
   document.getElementById("updatedAt").textContent = `Atualizado em ${formatDate(reading.created_at)}`;
+}
+
+function updateSummary(summaryPayload) {
+  document.getElementById("totalReadings").textContent =
+    integerFormat.format(summaryPayload.total_readings);
 }
 
 function renderStatusBadge(status) {
@@ -266,7 +333,58 @@ function updateChart(readings) {
   });
 }
 
-function updateCriticalHoursChart(hourCounts) {
+function drawLine(context, points, color) {
+  context.strokeStyle = color;
+  context.lineWidth = 2.5;
+  context.beginPath();
+  points.forEach((point, index) => {
+    if (index === 0) context.moveTo(point.x, point.y);
+    else context.lineTo(point.x, point.y);
+  });
+  context.stroke();
+
+  points.forEach((point) => {
+    context.fillStyle = "#fff";
+    context.beginPath();
+    context.arc(point.x, point.y, 4, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = color;
+    context.lineWidth = 2;
+    context.stroke();
+  });
+}
+
+function drawCriticalHoursTooltip(context, point, width) {
+  const lines = [
+    `${point.hour}h`,
+    `Alerta: ${point.alerta}`,
+    `Critico: ${point.critico}`,
+  ];
+  const boxWidth = 112;
+  const boxHeight = 74;
+  const x = Math.min(width - boxWidth - 10, Math.max(10, point.x + 12));
+  const y = Math.max(10, point.y - boxHeight - 12);
+
+  context.fillStyle = "rgba(16, 32, 51, 0.92)";
+  context.strokeStyle = "rgba(16, 32, 51, 0.18)";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.roundRect(x, y, boxWidth, boxHeight, 8);
+  context.fill();
+  context.stroke();
+
+  context.fillStyle = "#fff";
+  context.font = "700 12px sans-serif";
+  context.fillText(lines[0], x + 10, y + 18);
+  context.font = "12px sans-serif";
+  context.fillStyle = "#facc15";
+  context.fillText(lines[1], x + 10, y + 40);
+  context.fillStyle = "#fca5a5";
+  context.fillText(lines[2], x + 10, y + 58);
+}
+
+function updateCriticalHoursChart(hourCounts, hoverPoint = null) {
+  criticalHoursData = hourCounts;
   const { width, height } = prepareCanvas(criticalCanvas, criticalContext);
   const alertByHour = Array.from({ length: 24 }, () => 0);
   const criticalByHour = Array.from({ length: 24 }, () => 0);
@@ -283,19 +401,17 @@ function updateCriticalHoursChart(hourCounts) {
     `${totalAlerts} alertas, ${totalCritical} criticos`;
 
   if (totalOccurrences === 0) {
+    criticalHoursHoverPoint = null;
     criticalContext.fillStyle = "#526173";
     criticalContext.font = "14px sans-serif";
     criticalContext.fillText("Nenhum alerta ou critico no periodo selecionado.", 18, 32);
     return;
   }
 
-  const padding = { top: 18, right: 14, bottom: 34, left: 36 };
+  const padding = { top: 24, right: 44, bottom: 34, left: 42 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
-  const totalsByHour = alertByHour.map((value, hour) => value + criticalByHour[hour]);
-  const max = Math.max(...totalsByHour);
-  const barGap = 4;
-  const barWidth = (plotWidth - barGap * 23) / 24;
+  const max = Math.max(1, ...alertByHour, ...criticalByHour);
 
   criticalContext.strokeStyle = "#dfe6ef";
   criticalContext.lineWidth = 1;
@@ -307,23 +423,35 @@ function updateCriticalHoursChart(hourCounts) {
     criticalContext.stroke();
   }
 
-  totalsByHour.forEach((value, hour) => {
-    const x = padding.left + hour * (barWidth + barGap);
-    const alertHeight = (alertByHour[hour] / max) * plotHeight;
-    const criticalHeight = (criticalByHour[hour] / max) * plotHeight;
-    const alertY = padding.top + plotHeight - alertHeight;
-    const criticalY = alertY - criticalHeight;
+  criticalContext.fillStyle = "#526173";
+  criticalContext.font = "11px sans-serif";
+  for (let index = 0; index <= 4; index += 1) {
+    const value = Math.round(max - (max / 4) * index);
+    const y = padding.top + (plotHeight / 4) * index;
+    criticalContext.fillText(String(value), width - padding.right + 8, y + 4);
+  }
 
-    criticalContext.fillStyle = "#ca8a04";
-    criticalContext.fillRect(x, alertY, barWidth, alertHeight);
-    criticalContext.fillStyle = "#b91c1c";
-    criticalContext.fillRect(x, criticalY, barWidth, criticalHeight);
+  const points = Array.from({ length: 24 }, (_, hour) => {
+    const x = padding.left + (plotWidth / 23) * hour;
+    return {
+      hour,
+      x,
+      alerta: alertByHour[hour],
+      critico: criticalByHour[hour],
+      alertY: padding.top + plotHeight - (alertByHour[hour] / max) * plotHeight,
+      criticalY: padding.top + plotHeight - (criticalByHour[hour] / max) * plotHeight,
+    };
   });
+  const alertPoints = points.map((point) => ({ ...point, y: point.alertY }));
+  const criticalPoints = points.map((point) => ({ ...point, y: point.criticalY }));
+
+  drawLine(criticalContext, alertPoints, "#ca8a04");
+  drawLine(criticalContext, criticalPoints, "#b91c1c");
 
   criticalContext.fillStyle = "#526173";
   criticalContext.font = "11px sans-serif";
   [0, 6, 12, 18, 23].forEach((hour) => {
-    const x = padding.left + hour * (barWidth + barGap);
+    const x = padding.left + (plotWidth / 23) * hour;
     criticalContext.fillText(`${hour}h`, x, height - 10);
   });
 
@@ -336,6 +464,22 @@ function updateCriticalHoursChart(hourCounts) {
   criticalContext.fillRect(width - 108, legendY - 9, 10, 10);
   criticalContext.fillStyle = "#314159";
   criticalContext.fillText("Critico", width - 92, legendY);
+
+  if (hoverPoint) {
+    criticalContext.strokeStyle = "rgba(49, 65, 89, 0.35)";
+    criticalContext.lineWidth = 1;
+    criticalContext.beginPath();
+    criticalContext.moveTo(hoverPoint.x, padding.top);
+    criticalContext.lineTo(hoverPoint.x, padding.top + plotHeight);
+    criticalContext.stroke();
+    drawCriticalHoursTooltip(criticalContext, hoverPoint, width);
+  }
+
+  criticalHoursHoverPoint = {
+    points,
+    padding,
+    plotHeight,
+  };
 }
 
 function updatePaginationControls(scope, payload) {
@@ -354,17 +498,28 @@ function updatePaginationControls(scope, payload) {
   document.getElementById(`${scope}PageSize`).value = String(payload.page_size);
 }
 
-function getRequestKey(scope, url) {
-  return `${scope}:${url}`;
+function setSimulatorUpdateMessage(message, type) {
+  window.clearTimeout(simulatorMessageResetTimeout);
+  simulatorUpdateMessage.textContent = message;
+  simulatorUpdateMessage.className = type || "";
+}
+
+function scheduleSimulatorMessageReset() {
+  window.clearTimeout(simulatorMessageResetTimeout);
+  simulatorMessageResetTimeout = window.setTimeout(() => {
+    setSimulatorUpdateMessage(SIMULATOR_DEFAULT_MESSAGE, "");
+  }, 5000);
 }
 
 async function refreshDashboard() {
   try {
-    const [statusPayload, latestReadings] = await Promise.all([
+    const [statusPayload, latestReadings, summaryPayload] = await Promise.all([
       fetchJson("/api/readings/status"),
       fetchJson("/api/readings/latest?limit=20"),
+      fetchJson("/api/readings/summary"),
     ]);
     updateMetrics(statusPayload);
+    updateSummary(summaryPayload);
     updateTable(latestReadings);
     updateChart(latestReadings);
   } catch (error) {
@@ -375,6 +530,16 @@ async function refreshDashboard() {
 
 async function loadReadingsHistory() {
   const state = paginationState.readings;
+  try {
+    validateDateRange("readingsStart", "readingsEnd");
+  } catch (error) {
+    document.getElementById("allReadingsTable").innerHTML =
+      `<tr><td colspan="10">${error.message}</td></tr>`;
+    document.getElementById("readingsCount").textContent = "0 registros";
+    document.getElementById("readingsTotalInfo").textContent = "0 registros";
+    document.getElementById("readingsPageInfo").textContent = "Pagina 1 de 1";
+    return;
+  }
   const url = buildPeriodUrl(
     "/api/readings/history",
     "readingsStart",
@@ -382,49 +547,73 @@ async function loadReadingsHistory() {
     "readingsDevice",
     state,
   );
-  const requestKey = getRequestKey("readings", url);
-  if (state.isLoading && state.lastRequestKey === requestKey) return;
-
+  const requestId = state.requestId + 1;
+  state.requestId = requestId;
   state.isLoading = true;
-  state.lastRequestKey = requestKey;
+  document.getElementById("allReadingsTable").innerHTML =
+    '<tr><td colspan="10">Carregando historico...</td></tr>';
   try {
     const payload = await fetchJson(url);
+    if (requestId !== state.requestId) return;
     updatePaginationControls("readings", payload);
     document.getElementById("allReadingsTable").innerHTML = renderFullRows(
       payload.items,
       "Nenhuma leitura encontrada para o periodo.",
       10,
     );
+  } catch (error) {
+    if (requestId === state.requestId) {
+      document.getElementById("allReadingsTable").innerHTML =
+        `<tr><td colspan="10">Erro ao filtrar leituras: ${error.message}</td></tr>`;
+    }
+    throw error;
   } finally {
-    state.isLoading = false;
+    if (requestId === state.requestId) {
+      state.isLoading = false;
+    }
   }
 }
 
 async function loadAlertsHistory() {
   const state = paginationState.alerts;
+  try {
+    validateDateRange("alertsStart", "alertsEnd");
+  } catch (error) {
+    document.getElementById("alertsTable").innerHTML =
+      `<tr><td colspan="9">${error.message}</td></tr>`;
+    document.getElementById("alertsCount").textContent = "0 registros";
+    document.getElementById("alertsTotalInfo").textContent = "0 registros";
+    document.getElementById("alertsPageInfo").textContent = "Pagina 1 de 1";
+    updateCriticalHoursChart([]);
+    return;
+  }
   const url = buildPeriodUrl(
     "/api/readings/alerts",
     "alertsStart",
     "alertsEnd",
     "alertsDevice",
     state,
+    "alertsType",
   );
   const criticalHoursUrl = buildPeriodUrl(
     "/api/readings/alerts/critical-hours",
     "alertsStart",
     "alertsEnd",
     "alertsDevice",
+    null,
+    "alertsType",
   );
-  const requestKey = getRequestKey("alerts", url);
-  if (state.isLoading && state.lastRequestKey === requestKey) return;
-
+  const requestId = state.requestId + 1;
+  state.requestId = requestId;
   state.isLoading = true;
-  state.lastRequestKey = requestKey;
+  document.getElementById("alertsTable").innerHTML =
+    '<tr><td colspan="9">Carregando alertas...</td></tr>';
   try {
     const [payload, criticalHours] = await Promise.all([
       fetchJson(url),
       fetchJson(criticalHoursUrl),
     ]);
+    if (requestId !== state.requestId) return;
     updatePaginationControls("alerts", payload);
     document.getElementById("alertsTable").innerHTML = renderFullRows(
       payload.items,
@@ -432,8 +621,57 @@ async function loadAlertsHistory() {
       9,
     );
     updateCriticalHoursChart(criticalHours);
+  } catch (error) {
+    if (requestId === state.requestId) {
+      document.getElementById("alertsTable").innerHTML =
+        `<tr><td colspan="9">Erro ao filtrar alertas: ${error.message}</td></tr>`;
+    }
+    throw error;
   } finally {
-    state.isLoading = false;
+    if (requestId === state.requestId) {
+      state.isLoading = false;
+    }
+  }
+}
+
+async function refreshVisibleDataAfterSimulationUpdate() {
+  await setDefaultFilters();
+  await refreshDashboard();
+
+  if (document.getElementById("readingsView").classList.contains("active")) {
+    paginationState.readings.page = 1;
+    await loadReadingsHistory();
+  }
+  if (document.getElementById("alertsView").classList.contains("active")) {
+    paginationState.alerts.page = 1;
+    await loadAlertsHistory();
+  }
+}
+
+async function updateSimulatedDataUntilNow() {
+  if (updateSimulatedDataButton.disabled) return;
+
+  updateSimulatedDataButton.disabled = true;
+  updateSimulatedDataButton.classList.add("is-loading");
+  updateSimulatedDataText.textContent = "Atualizando...";
+  setSimulatorUpdateMessage("Gerando novos registros simulados...", "");
+
+  try {
+    const result = await postJson("/simulator/update-until-now", simulatorUpdatePayload);
+    if (result.total_generated > 0) {
+      setSimulatorUpdateMessage("Dados atualizados com sucesso", "success");
+      scheduleSimulatorMessageReset();
+    } else {
+      setSimulatorUpdateMessage(result.message || SIMULATOR_DEFAULT_MESSAGE, "");
+    }
+    await refreshVisibleDataAfterSimulationUpdate();
+  } catch (error) {
+    setSimulatorUpdateMessage(`Erro ao atualizar dados: ${error.message}`, "error");
+    console.error(error);
+  } finally {
+    updateSimulatedDataButton.disabled = false;
+    updateSimulatedDataButton.classList.remove("is-loading");
+    updateSimulatedDataText.textContent = "Atualizar dados";
   }
 }
 
@@ -462,6 +700,11 @@ document.getElementById("applyReadingsFilter").addEventListener("click", () => {
 });
 
 document.getElementById("applyAlertsFilter").addEventListener("click", () => {
+  paginationState.alerts.page = 1;
+  loadAlertsHistory().catch(console.error);
+});
+
+document.getElementById("alertsType").addEventListener("change", () => {
   paginationState.alerts.page = 1;
   loadAlertsHistory().catch(console.error);
 });
@@ -500,6 +743,26 @@ document.getElementById("alertsNextPage").addEventListener("click", () => {
   if (paginationState.alerts.page >= paginationState.alerts.totalPages) return;
   paginationState.alerts.page += 1;
   loadAlertsHistory().catch(console.error);
+});
+
+updateSimulatedDataButton.addEventListener("click", () => {
+  updateSimulatedDataUntilNow().catch(console.error);
+});
+
+criticalCanvas.addEventListener("mousemove", (event) => {
+  if (!criticalHoursHoverPoint || !criticalHoursData.length) return;
+  const rect = criticalCanvas.getBoundingClientRect();
+  const mouseX = event.clientX - rect.left;
+  const closest = criticalHoursHoverPoint.points.reduce((selected, point) => {
+    if (!selected) return point;
+    return Math.abs(point.x - mouseX) < Math.abs(selected.x - mouseX) ? point : selected;
+  }, null);
+  updateCriticalHoursChart(criticalHoursData, closest);
+});
+
+criticalCanvas.addEventListener("mouseleave", () => {
+  if (!criticalHoursData.length) return;
+  updateCriticalHoursChart(criticalHoursData);
 });
 
 async function initializeDashboard() {

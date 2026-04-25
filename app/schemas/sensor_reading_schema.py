@@ -54,6 +54,10 @@ class ReadingsDateRange(BaseModel):
     end_datetime: datetime | None = None
 
 
+class ReadingsSummary(BaseModel):
+    total_readings: int
+
+
 class PaginatedSensorReadings(BaseModel):
     items: list[SensorReadingResponse]
     total: int

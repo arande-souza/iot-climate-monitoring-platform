@@ -34,6 +34,17 @@
 
         <main class="layout">
           <section id="generalView" class="view active">
+            <section class="action-bar" aria-label="Acoes do dashboard">
+              <div>
+                <strong>Coleta de dados</strong>
+                <span id="simulatorUpdateMessage">Area de atualização manual</span>
+              </div>
+              <button id="updateSimulatedData" type="button" aria-label="Atualizar dados">
+                <span class="refresh-icon" aria-hidden="true">↻</span>
+                <span id="updateSimulatedDataText">Atualizar dados</span>
+              </button>
+            </section>
+
             <section class="metrics-grid" aria-label="Metricas atuais">
               <article class="metric">
                 <span class="metric-label">Temperatura</span>
@@ -54,6 +65,11 @@
                 <span class="metric-label">PM2.5</span>
                 <strong id="pm25">--</strong>
                 <small>ug/m3</small>
+              </article>
+              <article class="metric">
+                <span class="metric-label">Dados coletados</span>
+                <strong id="totalReadings">--</strong>
+                <small>registros</small>
               </article>
             </section>
 
@@ -174,6 +190,14 @@
               <label>
                 Dispositivo
                 <input id="alertsDevice" type="text" placeholder="Todos" />
+              </label>
+              <label>
+                Tipo de alerta
+                <select id="alertsType" aria-label="Tipo de alerta">
+                  <option value="">Todos</option>
+                  <option value="alerta">Alerta</option>
+                  <option value="critico">Critico</option>
+                </select>
               </label>
               <button id="applyAlertsFilter" type="button">Filtrar</button>
             </section>

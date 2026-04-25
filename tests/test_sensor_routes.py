@@ -102,6 +102,10 @@ def test_history_can_return_all_readings_and_date_range():
         assert date_range.json()["start_datetime"] is not None
         assert date_range.json()["end_datetime"] is not None
 
+        summary = client.get("/api/readings/summary")
+        assert summary.status_code == 200
+        assert summary.json()["total_readings"] == 2
+
 
 def test_history_pagination_accepts_expected_page_sizes():
     with TestClient(app) as client:
@@ -158,6 +162,20 @@ def test_alert_history_returns_only_alert_and_critical_readings():
         assert sum(item["critico"] for item in critical_hours.json()) == 1
         assert sum(item["total"] for item in critical_hours.json()) == 2
 
+        filtered_alerts = client.get(
+            f"/api/readings/alerts?start={start}&end={end}&alert_type=critico"
+        )
+        assert filtered_alerts.status_code == 200
+        assert filtered_alerts.json()["total"] == 1
+        assert filtered_alerts.json()["items"][0]["air_quality_status"] == "critico"
+
+        filtered_hours = client.get(
+            f"/api/readings/alerts/critical-hours?start={start}&end={end}&alert_type=alerta"
+        )
+        assert filtered_hours.status_code == 200
+        assert sum(item["alerta"] for item in filtered_hours.json()) == 1
+        assert sum(item["critico"] for item in filtered_hours.json()) == 0
+
 
 def test_simulator_generate_creates_historical_readings():
     with TestClient(app) as client:
@@ -202,3 +220,54 @@ def test_simulator_validates_date_range_frequency_and_limit():
         payload["frequency_seconds"] = 1
         payload["end_datetime"] = "2026-03-18T12:00:00"
         assert client.post("/simulator/generate", json=payload).status_code == 400
+
+
+def test_simulator_update_until_now_generates_from_last_reading():
+    with TestClient(app) as client:
+        payload = sample_payload()
+        client.post("/api/readings", json=payload)
+
+        response = client.post(
+            "/simulator/update-until-now",
+            json={
+                "device_id": "esp32-sala-01",
+                "location": "Santo André - SP",
+                "frequency_seconds": 3600,
+                "profile": "normal",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "message" in data
+        assert data["total_generated"] >= 0
+
+
+def test_simulator_update_until_now_returns_no_data_when_current():
+    with TestClient(app) as client:
+        response = client.post(
+            "/simulator/generate",
+            json={
+                "device_id": "esp32-sala-01",
+                "location": "Santo André - SP",
+                "start_datetime": datetime.now(timezone.utc).isoformat(),
+                "end_datetime": (datetime.now(timezone.utc) + timedelta(minutes=1)).isoformat(),
+                "frequency_seconds": 60,
+                "profile": "normal",
+            },
+        )
+        assert response.status_code == 200
+
+        response = client.post(
+            "/simulator/update-until-now",
+            json={
+                "device_id": "esp32-sala-01",
+                "location": "Santo André - SP",
+                "frequency_seconds": 60,
+                "profile": "normal",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["message"] == "Coleta atualizada, aguarde pelo menos 60s"
+        assert response.json()["total_generated"] == 0
