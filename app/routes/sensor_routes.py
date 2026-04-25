@@ -93,6 +93,24 @@ def get_reading_status_filter(reading_status: str | None) -> tuple[str, ...] | N
     return ALERT_STATUS_VALUES[reading_status]
 
 
+def parse_optional_datetime(value: str | None, field_name: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        try:
+            normalized_value = value.rsplit(" ", 1)
+            if len(normalized_value) == 2:
+                return datetime.fromisoformat("+".join(normalized_value))
+        except ValueError:
+            pass
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=f"{field_name} deve estar em formato ISO 8601",
+    )
+
+
 @router.post(
     "",
     response_model=SensorReadingResponse,
@@ -113,8 +131,8 @@ def list_latest_readings(
 
 @router.get("/history", response_model=PaginatedSensorReadings)
 def get_history(
-    start: datetime | None = Query(default=None, description="Data inicial em ISO 8601"),
-    end: datetime | None = Query(default=None, description="Data final em ISO 8601"),
+    start: str | None = Query(default=None, description="Data inicial em ISO 8601"),
+    end: str | None = Query(default=None, description="Data final em ISO 8601"),
     device_id: str | None = Query(default=None),
     status_filter: str | None = Query(
         default=None,
@@ -124,17 +142,19 @@ def get_history(
     page_size: int = Query(default=50),
     db: Session = Depends(get_db),
 ):
-    if start and end and start > end:
+    start_datetime = parse_optional_datetime(start, "start")
+    end_datetime = parse_optional_datetime(end, "end")
+    if start_datetime and end_datetime and start_datetime > end_datetime:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="start deve ser anterior ou igual a end",
         )
 
     conditions = []
-    if start:
-        conditions.append(SensorReading.created_at >= start)
-    if end:
-        conditions.append(SensorReading.created_at <= end)
+    if start_datetime:
+        conditions.append(SensorReading.created_at >= start_datetime)
+    if end_datetime:
+        conditions.append(SensorReading.created_at <= end_datetime)
     if device_id:
         conditions.append(SensorReading.device_id == device_id)
     status_values = get_reading_status_filter(status_filter)
@@ -173,15 +193,17 @@ def get_readings_summary(db: Session = Depends(get_db)):
 
 @router.get("/alerts", response_model=PaginatedSensorReadings)
 def get_alert_history(
-    start: datetime | None = Query(default=None, description="Data inicial em ISO 8601"),
-    end: datetime | None = Query(default=None, description="Data final em ISO 8601"),
+    start: str | None = Query(default=None, description="Data inicial em ISO 8601"),
+    end: str | None = Query(default=None, description="Data final em ISO 8601"),
     device_id: str | None = Query(default=None),
     alert_type: str | None = Query(default=None, description="Tipo do alerta: alerta ou critico"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50),
     db: Session = Depends(get_db),
 ):
-    if start and end and start > end:
+    start_datetime = parse_optional_datetime(start, "start")
+    end_datetime = parse_optional_datetime(end, "end")
+    if start_datetime and end_datetime and start_datetime > end_datetime:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="start deve ser anterior ou igual a end",
@@ -190,10 +212,10 @@ def get_alert_history(
     conditions = [
         SensorReading.air_quality_status.in_(get_alert_status_filter(alert_type)),
     ]
-    if start:
-        conditions.append(SensorReading.created_at >= start)
-    if end:
-        conditions.append(SensorReading.created_at <= end)
+    if start_datetime:
+        conditions.append(SensorReading.created_at >= start_datetime)
+    if end_datetime:
+        conditions.append(SensorReading.created_at <= end_datetime)
     if device_id:
         conditions.append(SensorReading.device_id == device_id)
 
@@ -204,13 +226,15 @@ def get_alert_history(
 
 @router.get("/alerts/critical-hours", response_model=list[CriticalHourCount])
 def get_critical_hours(
-    start: datetime | None = Query(default=None, description="Data inicial em ISO 8601"),
-    end: datetime | None = Query(default=None, description="Data final em ISO 8601"),
+    start: str | None = Query(default=None, description="Data inicial em ISO 8601"),
+    end: str | None = Query(default=None, description="Data final em ISO 8601"),
     device_id: str | None = Query(default=None),
     alert_type: str | None = Query(default=None, description="Tipo do alerta: alerta ou critico"),
     db: Session = Depends(get_db),
 ):
-    if start and end and start > end:
+    start_datetime = parse_optional_datetime(start, "start")
+    end_datetime = parse_optional_datetime(end, "end")
+    if start_datetime and end_datetime and start_datetime > end_datetime:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="start deve ser anterior ou igual a end",
@@ -219,10 +243,10 @@ def get_critical_hours(
     conditions = [
         SensorReading.air_quality_status.in_(get_alert_status_filter(alert_type)),
     ]
-    if start:
-        conditions.append(SensorReading.created_at >= start)
-    if end:
-        conditions.append(SensorReading.created_at <= end)
+    if start_datetime:
+        conditions.append(SensorReading.created_at >= start_datetime)
+    if end_datetime:
+        conditions.append(SensorReading.created_at <= end_datetime)
     if device_id:
         conditions.append(SensorReading.device_id == device_id)
 

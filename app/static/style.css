@@ -10,6 +10,11 @@
   box-sizing: border-box;
 }
 
+html {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -25,6 +30,7 @@ select {
 .app-shell {
   display: block;
   min-height: 100vh;
+  width: 100%;
 }
 
 .sidebar {
@@ -98,6 +104,7 @@ select {
   margin-left: var(--sidebar-width);
   min-width: 0;
   overflow-y: auto;
+  width: calc(100% - var(--sidebar-width));
 }
 
 .topbar {
@@ -108,6 +115,10 @@ select {
   gap: 24px;
   justify-content: space-between;
   padding: 22px clamp(16px, 4vw, 40px);
+}
+
+.topbar > div:first-child {
+  min-width: 0;
 }
 
 .topbar h1 {
@@ -159,6 +170,7 @@ select {
   margin: 0 auto;
   max-width: 1240px;
   padding: 24px clamp(16px, 4vw, 40px) 40px;
+  width: 100%;
 }
 
 .view {
@@ -168,6 +180,11 @@ select {
 .view.active {
   display: grid;
   gap: 20px;
+  min-width: 0;
+}
+
+.view > * {
+  min-width: 0;
 }
 
 .metrics-grid {
@@ -462,7 +479,9 @@ h2 {
 }
 
 .table-wrap {
+  max-width: 100%;
   overflow-x: auto;
+  width: 100%;
 }
 
 table {
@@ -518,7 +537,8 @@ td {
 
 @media (max-width: 920px) {
   body {
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .app-shell {
@@ -528,26 +548,45 @@ td {
   .sidebar {
     height: auto;
     min-height: auto;
-    position: static;
-    width: auto;
+    padding: 16px;
+    position: sticky;
+    top: 0;
+    width: 100%;
   }
 
   .content-shell {
     height: auto;
     margin-left: 0;
     overflow-y: visible;
+    width: 100%;
+  }
+
+  .brand {
+    margin-bottom: 16px;
   }
 
   .nav-menu {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
   }
 
   .nav-item {
+    flex: 0 0 auto;
+    min-width: max-content;
+    padding-inline: 14px;
     text-align: center;
   }
 
   .sidebar-footer {
-    margin-top: 18px;
+    margin-top: 14px;
+    padding-top: 14px;
+  }
+
+  #logoutButton {
+    min-height: 38px;
   }
 
   .topbar,
@@ -558,6 +597,19 @@ td {
     flex-direction: column;
   }
 
+  .topbar {
+    gap: 10px;
+  }
+
+  .layout {
+    padding-top: 18px;
+  }
+
+  .table-section,
+  .chart-section {
+    overflow: hidden;
+  }
+
   .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -565,20 +617,142 @@ td {
   .filter-panel {
     grid-template-columns: 1fr 1fr;
   }
+
+  .filter-panel button,
+  #updateSimulatedData {
+    width: 100%;
+  }
+
+  .pagination-bar {
+    justify-content: flex-start;
+  }
+
+  .page-size-control {
+    margin-right: 0;
+  }
 }
 
 @media (max-width: 620px) {
-  .brand {
-    margin-bottom: 18px;
+  .sidebar {
+    padding: 14px 12px;
   }
 
-  .nav-menu,
+  .brand {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .brand-mark {
+    height: 38px;
+    width: 38px;
+  }
+
+  .brand strong {
+    font-size: 0.98rem;
+  }
+
+  .brand small {
+    font-size: 0.78rem;
+  }
+
   .metrics-grid,
   .filter-panel {
     grid-template-columns: 1fr;
   }
 
+  .nav-menu {
+    margin-inline: -2px;
+  }
+
+  .nav-item {
+    min-height: 40px;
+  }
+
+  .topbar {
+    padding: 16px;
+  }
+
+  .topbar h1 {
+    font-size: 1.35rem;
+  }
+
+  .topbar p,
+  .timestamp {
+    font-size: 0.92rem;
+  }
+
+  .layout {
+    max-width: 100%;
+    padding: 14px 12px 28px;
+  }
+
+  .action-bar,
+  .chart-section,
+  .table-section,
+  .filter-panel,
+  .status-band {
+    padding: 14px;
+  }
+
+  .metric {
+    min-height: 92px;
+    padding: 12px;
+  }
+
+  .metric strong {
+    font-size: 1.6rem;
+  }
+
+  .section-heading,
+  .pagination-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .page-size-control,
+  .pagination-bar button,
+  .pagination-bar span,
+  .pagination-total {
+    width: 100%;
+  }
+
+  .page-size-control select {
+    flex: 1;
+  }
+
+  .pagination-bar button {
+    text-align: center;
+  }
+
   .timestamp {
     white-space: normal;
+  }
+
+  table {
+    min-width: 760px;
+  }
+}
+
+@media (max-width: 420px) {
+  .brand {
+    align-items: flex-start;
+  }
+
+  .brand small {
+    max-width: 210px;
+  }
+
+  .topbar {
+    padding-inline: 12px;
+  }
+
+  #historyChart,
+  #criticalHoursChart {
+    height: 220px;
+  }
+
+  th,
+  td {
+    padding: 10px 8px;
   }
 }
