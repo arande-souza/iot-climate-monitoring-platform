@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Monitoramento Climatico IoT</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Menu principal">
+        <div class="brand">
+          <span class="brand-mark">MC</span>
+          <div>
+            <strong>Monitor Climatico</strong>
+            <small>Ambientes tecnologicos</small>
+          </div>
+        </div>
+        <nav class="nav-menu">
+          <button class="nav-item active" type="button" data-view="generalView">Geral</button>
+          <button class="nav-item" type="button" data-view="readingsView">Historico Leituras</button>
+          <button class="nav-item" type="button" data-view="alertsView">Historico Alertas</button>
+        </nav>
+      </aside>
+
+      <div class="content-shell">
+        <header class="topbar">
+          <div>
+            <h1 id="pageTitle">Geral</h1>
+            <p id="pageSubtitle">Status atual e leituras recentes dos sensores IoT</p>
+          </div>
+          <span id="updatedAt" class="timestamp">Atualizando...</span>
+        </header>
+
+        <main class="layout">
+          <section id="generalView" class="view active">
+            <section class="metrics-grid" aria-label="Metricas atuais">
+              <article class="metric">
+                <span class="metric-label">Temperatura</span>
+                <strong id="temperature">--</strong>
+                <small>°C</small>
+              </article>
+              <article class="metric">
+                <span class="metric-label">Umidade</span>
+                <strong id="humidity">--</strong>
+                <small>%</small>
+              </article>
+              <article class="metric">
+                <span class="metric-label">CO2</span>
+                <strong id="co2">--</strong>
+                <small>ppm</small>
+              </article>
+              <article class="metric">
+                <span class="metric-label">PM2.5</span>
+                <strong id="pm25">--</strong>
+                <small>ug/m3</small>
+              </article>
+            </section>
+
+            <section class="status-band">
+              <div>
+                <span>Status geral</span>
+                <strong id="status">sem dados</strong>
+              </div>
+              <p id="recommendations">Aguardando leituras dos sensores.</p>
+            </section>
+
+            <section class="chart-section">
+              <h2>Historico recente</h2>
+              <canvas id="historyChart"></canvas>
+            </section>
+
+            <section class="table-section">
+              <h2>Ultimas leituras</h2>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Dispositivo</th>
+                      <th>Local</th>
+                      <th>Temp.</th>
+                      <th>Umid.</th>
+                      <th>CO2</th>
+                      <th>PM2.5</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="readingsTable">
+                    <tr>
+                      <td colspan="8">Carregando leituras...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+
+          <section id="readingsView" class="view">
+            <section class="filter-panel">
+              <label>
+                Inicio
+                <input id="readingsStart" type="datetime-local" />
+              </label>
+              <label>
+                Fim
+                <input id="readingsEnd" type="datetime-local" />
+              </label>
+              <label>
+                Dispositivo
+                <input id="readingsDevice" type="text" placeholder="Todos" />
+              </label>
+              <button id="applyReadingsFilter" type="button">Filtrar</button>
+            </section>
+
+            <section class="table-section">
+              <div class="section-heading">
+                <h2>Todas as leituras</h2>
+                <span id="readingsCount" class="counter">0 registros</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Dispositivo</th>
+                      <th>Local</th>
+                      <th>Temp.</th>
+                      <th>Umid.</th>
+                      <th>Pressao</th>
+                      <th>CO2</th>
+                      <th>PM2.5</th>
+                      <th>PM10</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="allReadingsTable">
+                    <tr>
+                      <td colspan="10">Use o filtro para consultar o historico.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="pagination-bar">
+                <div class="page-size-control">
+                  <label for="readingsPageSize">Exibir</label>
+                  <select id="readingsPageSize" aria-label="Itens por pagina do historico de leituras">
+                    <option value="20">20</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                    <option value="200">200</option>
+                    <option value="500">500</option>
+                    <option value="1000">1000</option>
+                  </select>
+                </div>
+                <span id="readingsTotalInfo" class="pagination-total">0 registros</span>
+                <button id="readingsPrevPage" type="button">Anterior</button>
+                <span id="readingsPageInfo">Pagina 1 de 1</span>
+                <button id="readingsNextPage" type="button">Proxima</button>
+              </div>
+            </section>
+          </section>
+
+          <section id="alertsView" class="view">
+            <section class="filter-panel">
+              <label>
+                Inicio
+                <input id="alertsStart" type="datetime-local" />
+              </label>
+              <label>
+                Fim
+                <input id="alertsEnd" type="datetime-local" />
+              </label>
+              <label>
+                Dispositivo
+                <input id="alertsDevice" type="text" placeholder="Todos" />
+              </label>
+              <button id="applyAlertsFilter" type="button">Filtrar</button>
+            </section>
+
+            <section class="chart-section">
+              <div class="section-heading">
+                <h2>Horario Critico</h2>
+                <span id="criticalHoursCount" class="counter">0 ocorrencias</span>
+              </div>
+              <canvas id="criticalHoursChart"></canvas>
+            </section>
+
+            <section class="table-section">
+              <div class="section-heading">
+                <h2>Alertas e criticos</h2>
+                <span id="alertsCount" class="counter">0 registros</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Dispositivo</th>
+                      <th>Local</th>
+                      <th>Temp.</th>
+                      <th>Umid.</th>
+                      <th>CO2</th>
+                      <th>PM2.5</th>
+                      <th>PM10</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="alertsTable">
+                    <tr>
+                      <td colspan="9">Use o filtro para consultar os alertas.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="pagination-bar">
+                <div class="page-size-control">
+                  <label for="alertsPageSize">Exibir</label>
+                  <select id="alertsPageSize" aria-label="Itens por pagina do historico de alertas">
+                    <option value="20">20</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                    <option value="200">200</option>
+                    <option value="500">500</option>
+                    <option value="1000">1000</option>
+                  </select>
+                </div>
+                <span id="alertsTotalInfo" class="pagination-total">0 registros</span>
+                <button id="alertsPrevPage" type="button">Anterior</button>
+                <span id="alertsPageInfo">Pagina 1 de 1</span>
+                <button id="alertsNextPage" type="button">Proxima</button>
+              </div>
+            </section>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="/static/dashboard.js"></script>
+  </body>
+</html>
