@@ -1,6 +1,9 @@
+import csv
 from datetime import datetime
+from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import extract, func, select
 from sqlalchemy.orm import Session
 
@@ -111,6 +114,75 @@ def parse_optional_datetime(value: str | None, field_name: str) -> datetime | No
     )
 
 
+def build_history_conditions(
+    start: str | None,
+    end: str | None,
+    device_id: str | None,
+    status_filter: str | None,
+):
+    start_datetime = parse_optional_datetime(start, "start")
+    end_datetime = parse_optional_datetime(end, "end")
+    if start_datetime and end_datetime and start_datetime > end_datetime:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start deve ser anterior ou igual a end",
+        )
+
+    conditions = []
+    if start_datetime:
+        conditions.append(SensorReading.created_at >= start_datetime)
+    if end_datetime:
+        conditions.append(SensorReading.created_at <= end_datetime)
+    if device_id:
+        conditions.append(SensorReading.device_id == device_id)
+    status_values = get_reading_status_filter(status_filter)
+    if status_values:
+        conditions.append(SensorReading.air_quality_status.in_(status_values))
+    return conditions
+
+
+def build_alert_conditions(
+    start: str | None,
+    end: str | None,
+    device_id: str | None,
+    alert_type: str | None,
+):
+    start_datetime = parse_optional_datetime(start, "start")
+    end_datetime = parse_optional_datetime(end, "end")
+    if start_datetime and end_datetime and start_datetime > end_datetime:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start deve ser anterior ou igual a end",
+        )
+
+    conditions = [
+        SensorReading.air_quality_status.in_(get_alert_status_filter(alert_type)),
+    ]
+    if start_datetime:
+        conditions.append(SensorReading.created_at >= start_datetime)
+    if end_datetime:
+        conditions.append(SensorReading.created_at <= end_datetime)
+    if device_id:
+        conditions.append(SensorReading.device_id == device_id)
+    return conditions
+
+
+def build_readings_csv_response(readings, headers: list[str], row_builder, filename: str):
+    output = StringIO()
+    output.write("\ufeff")
+    writer = csv.writer(output)
+    writer.writerow(headers)
+
+    for reading in readings:
+        writer.writerow(row_builder(reading))
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.post(
     "",
     response_model=SensorReadingResponse,
@@ -142,28 +214,54 @@ def get_history(
     page_size: int = Query(default=50),
     db: Session = Depends(get_db),
 ):
-    start_datetime = parse_optional_datetime(start, "start")
-    end_datetime = parse_optional_datetime(end, "end")
-    if start_datetime and end_datetime and start_datetime > end_datetime:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="start deve ser anterior ou igual a end",
-        )
-
-    conditions = []
-    if start_datetime:
-        conditions.append(SensorReading.created_at >= start_datetime)
-    if end_datetime:
-        conditions.append(SensorReading.created_at <= end_datetime)
-    if device_id:
-        conditions.append(SensorReading.device_id == device_id)
-    status_values = get_reading_status_filter(status_filter)
-    if status_values:
-        conditions.append(SensorReading.air_quality_status.in_(status_values))
-
+    conditions = build_history_conditions(start, end, device_id, status_filter)
     stmt = select(SensorReading).where(*conditions).order_by(SensorReading.created_at.asc())
     count_stmt = select(func.count()).select_from(SensorReading).where(*conditions)
     return paginate_readings(db, stmt, count_stmt, page, page_size)
+
+
+@router.get("/history/export")
+def export_history_csv(
+    start: str | None = Query(default=None, description="Data inicial em ISO 8601"),
+    end: str | None = Query(default=None, description="Data final em ISO 8601"),
+    device_id: str | None = Query(default=None),
+    status_filter: str | None = Query(
+        default=None,
+        description="Status da leitura: ideal, aceitavel, alerta ou critico",
+    ),
+    db: Session = Depends(get_db),
+):
+    conditions = build_history_conditions(start, end, device_id, status_filter)
+    stmt = select(SensorReading).where(*conditions).order_by(SensorReading.created_at.asc())
+    readings = db.scalars(stmt).all()
+    return build_readings_csv_response(
+        readings,
+        [
+            "Data",
+            "Dispositivo",
+            "Local",
+            "Temp.",
+            "Umid.",
+            "Pressao",
+            "CO2",
+            "PM2.5",
+            "PM10",
+            "Status",
+        ],
+        lambda reading: [
+            reading.created_at.isoformat(),
+            reading.device_id,
+            reading.location,
+            reading.temperature,
+            reading.humidity,
+            reading.pressure,
+            reading.co2,
+            reading.pm25,
+            reading.pm10,
+            reading.air_quality_status,
+        ],
+        "historico_leituras.csv",
+    )
 
 
 @router.get("/range", response_model=ReadingsDateRange)
@@ -201,27 +299,49 @@ def get_alert_history(
     page_size: int = Query(default=50),
     db: Session = Depends(get_db),
 ):
-    start_datetime = parse_optional_datetime(start, "start")
-    end_datetime = parse_optional_datetime(end, "end")
-    if start_datetime and end_datetime and start_datetime > end_datetime:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="start deve ser anterior ou igual a end",
-        )
-
-    conditions = [
-        SensorReading.air_quality_status.in_(get_alert_status_filter(alert_type)),
-    ]
-    if start_datetime:
-        conditions.append(SensorReading.created_at >= start_datetime)
-    if end_datetime:
-        conditions.append(SensorReading.created_at <= end_datetime)
-    if device_id:
-        conditions.append(SensorReading.device_id == device_id)
-
+    conditions = build_alert_conditions(start, end, device_id, alert_type)
     stmt = select(SensorReading).where(*conditions).order_by(SensorReading.created_at.asc())
     count_stmt = select(func.count()).select_from(SensorReading).where(*conditions)
     return paginate_readings(db, stmt, count_stmt, page, page_size)
+
+
+@router.get("/alerts/export")
+def export_alerts_csv(
+    start: str | None = Query(default=None, description="Data inicial em ISO 8601"),
+    end: str | None = Query(default=None, description="Data final em ISO 8601"),
+    device_id: str | None = Query(default=None),
+    alert_type: str | None = Query(default=None, description="Tipo do alerta: alerta ou critico"),
+    db: Session = Depends(get_db),
+):
+    conditions = build_alert_conditions(start, end, device_id, alert_type)
+    stmt = select(SensorReading).where(*conditions).order_by(SensorReading.created_at.asc())
+    readings = db.scalars(stmt).all()
+    return build_readings_csv_response(
+        readings,
+        [
+            "Data",
+            "Dispositivo",
+            "Local",
+            "Temp.",
+            "Umid.",
+            "CO2",
+            "PM2.5",
+            "PM10",
+            "Status",
+        ],
+        lambda reading: [
+            reading.created_at.isoformat(),
+            reading.device_id,
+            reading.location,
+            reading.temperature,
+            reading.humidity,
+            reading.co2,
+            reading.pm25,
+            reading.pm10,
+            reading.air_quality_status,
+        ],
+        "historico_alertas.csv",
+    )
 
 
 @router.get("/alerts/critical-hours", response_model=list[CriticalHourCount])
@@ -232,24 +352,7 @@ def get_critical_hours(
     alert_type: str | None = Query(default=None, description="Tipo do alerta: alerta ou critico"),
     db: Session = Depends(get_db),
 ):
-    start_datetime = parse_optional_datetime(start, "start")
-    end_datetime = parse_optional_datetime(end, "end")
-    if start_datetime and end_datetime and start_datetime > end_datetime:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="start deve ser anterior ou igual a end",
-        )
-
-    conditions = [
-        SensorReading.air_quality_status.in_(get_alert_status_filter(alert_type)),
-    ]
-    if start_datetime:
-        conditions.append(SensorReading.created_at >= start_datetime)
-    if end_datetime:
-        conditions.append(SensorReading.created_at <= end_datetime)
-    if device_id:
-        conditions.append(SensorReading.device_id == device_id)
-
+    conditions = build_alert_conditions(start, end, device_id, alert_type)
     if db.bind and db.bind.dialect.name == "postgresql":
         chart_datetime = func.timezone("America/Sao_Paulo", SensorReading.created_at)
     else:

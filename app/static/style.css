@@ -360,7 +360,7 @@ select {
   align-items: end;
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(4, minmax(150px, 1fr)) auto;
+  grid-template-columns: repeat(4, minmax(140px, 1fr)) auto auto;
   padding: 16px;
 }
 
@@ -393,6 +393,24 @@ select {
 
 .filter-panel button:hover {
   background: #115e59;
+}
+
+.filter-panel button.secondary-action {
+  background: #fff;
+  border: 1px solid #0f766e;
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.filter-panel button.secondary-action:hover {
+  background: #e6fffb;
+}
+
+.filter-panel button:disabled {
+  background: #94a3b8;
+  border-color: #94a3b8;
+  color: #fff;
+  cursor: wait;
 }
 
 .pagination-bar {
@@ -449,6 +467,7 @@ select {
 #updateSimulatedData:focus-visible,
 #logoutButton:focus-visible,
 .filter-panel button:focus-visible,
+.filter-panel button.secondary-action:focus-visible,
 .pagination-bar button:focus-visible,
 .filter-panel input:focus-visible,
 .filter-panel select:focus-visible,

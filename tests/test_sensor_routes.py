@@ -1,5 +1,7 @@
+import csv
 import os
 from datetime import datetime, timedelta, timezone
+from io import StringIO
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_iot_climate.db"
 os.environ["MQTT_ENABLED"] = "false"
@@ -178,6 +180,36 @@ def test_history_filters_by_status():
         assert data["items"][0]["air_quality_status"] == "alerta"
 
 
+def test_history_export_csv_uses_applied_filters_and_grid_columns():
+    with authenticated_client() as client:
+        client.post("/api/readings", json=sample_payload("esp32-ideal-01"))
+
+        alert_payload = sample_payload("esp32-alerta-01")
+        alert_payload["temperature"] = 29.2
+        client.post("/api/readings", json=alert_payload)
+
+        response = client.get("/api/readings/history/export?status_filter=alerta")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/csv")
+
+        rows = list(csv.reader(StringIO(response.text.lstrip("\ufeff"))))
+        assert rows[0] == [
+            "Data",
+            "Dispositivo",
+            "Local",
+            "Temp.",
+            "Umid.",
+            "Pressao",
+            "CO2",
+            "PM2.5",
+            "PM10",
+            "Status",
+        ]
+        assert len(rows) == 2
+        assert rows[1][1] == "esp32-alerta-01"
+        assert rows[1][9] == "alerta"
+
+
 def test_alert_history_returns_only_alert_and_critical_readings():
     with authenticated_client() as client:
         client.post("/api/readings", json=sample_payload())
@@ -222,6 +254,40 @@ def test_alert_history_returns_only_alert_and_critical_readings():
         assert filtered_hours.status_code == 200
         assert sum(item["alerta"] for item in filtered_hours.json()) == 1
         assert sum(item["critico"] for item in filtered_hours.json()) == 0
+
+
+def test_alert_export_csv_uses_applied_filters_and_grid_columns():
+    with authenticated_client() as client:
+        client.post("/api/readings", json=sample_payload())
+
+        alert_payload = sample_payload("esp32-alerta-01")
+        alert_payload["temperature"] = 29.2
+        alert_payload["co2"] = 1180
+        client.post("/api/readings", json=alert_payload)
+
+        critical_payload = sample_payload("esp32-critico-01")
+        critical_payload["co2"] = 1800
+        critical_payload["pm25"] = 48.0
+        client.post("/api/readings", json=critical_payload)
+
+        response = client.get("/api/readings/alerts/export?alert_type=critico")
+        assert response.status_code == 200
+
+        rows = list(csv.reader(StringIO(response.text.lstrip("\ufeff"))))
+        assert rows[0] == [
+            "Data",
+            "Dispositivo",
+            "Local",
+            "Temp.",
+            "Umid.",
+            "CO2",
+            "PM2.5",
+            "PM10",
+            "Status",
+        ]
+        assert len(rows) == 2
+        assert rows[1][1] == "esp32-critico-01"
+        assert rows[1][8] == "critico"
 
 
 def test_simulator_generate_creates_historical_readings():

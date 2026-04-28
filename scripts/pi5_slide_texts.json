@@ -1,0 +1,69 @@
+{
+  "1": [
+    "UNIVERSIDADE VIRTUAL DO ESTADO DE SÃO PAULO",
+    "Projeto",
+    "",
+    "Integrador",
+    "V",
+    "Eixo Computação:",
+    "Engenharia da Computação",
+    "Polo: Santo André, SP"
+  ],
+  "2": [
+    "DRP01-PJI510 - PROJETO INTEGRADOR V",
+    "MILCA GUALTER CERQUEIRA DE ABREU, 23211356",
+    "CESAR AUGUSTO DE LIMA ALMEIDA, 1400457",
+    "PETERSON BENHAME DOS SANTOS, 1828731",
+    "MURILO BUSON, 23218954",
+    "ARANDÊ CRISTINA DA SILVA SOUZA, 2011438",
+    "HUGO RAFAEL GONÇALVES GIANPIETRO COSTA, 1825563",
+    "GABRIEL VENANCIO DA SILVA, 2231736",
+    "Tutora: Brenda Alessandra Munhoz"
+  ],
+  "3": [
+    "Empresas do setor de tecnologia dependem de condições ambientais adequadas para preservar equipamentos, estabilidade operacional e conforto dos colaboradores. A ausência de monitoramento climático contínuo dificulta decisões sobre climatização, manutenção e investimentos.",
+    "Este projeto propõe uma plataforma IoT para coletar, processar e apresentar dados de temperatura, umidade, CO2 e particulados em tempo real. A solução combina sensores, comunicação MQTT, API, banco de dados e dashboard para apoiar decisões baseadas em dados.",
+    "SISTEMA DE MONITORAMENTO CLIMÁTICO PARA OTIMIZAÇÃO DE AMBIENTES TECNOLÓGICOS"
+  ],
+  "4": [
+    "Desenvolver um sistema IoT para captura, análise e processamento de dados climáticos em tempo real, com interface web para apoiar decisões relacionadas à climatização em ambientes corporativos.",
+    "OBJETIVO:",
+    "Sendo assim:",
+    "Identificar necessidades da empresa por entrevistas e observações.",
+    "Levantar requisitos técnicos e operacionais do sistema.",
+    "Pesquisar tecnologias de IoT, sensores, integração MQTT e APIs.",
+    "Desenvolver protótipo funcional com coleta, processamento e visualização.",
+    "Testar e validar a solução com dados simulados e feedback dos usuários.",
+    "Analisar dados para propor melhorias e apoiar decisões preventivas."
+  ],
+  "5": [
+    "A falta de monitoramento contínuo pode gerar desconforto térmico, queda de produtividade e desgaste acelerado de equipamentos sensíveis. Com dados confiáveis, a empresa pode identificar variações ambientais, agir preventivamente e planejar melhor investimentos em climatização e infraestrutura. O projeto delimita-se ao monitoramento ambiental de ambientes tecnológicos, com foco em protótipo funcional para temperatura, umidade e qualidade do ar.",
+    "JUSTIFICATIVA E DELIMITAÇÃO DO PROBLEMA"
+  ],
+  "6": [
+    "A Internet das Coisas permite conectar dispositivos físicos a sistemas computacionais, viabilizando coleta contínua, monitoramento remoto e respostas orientadas por dados.",
+    "A fundamentação teórica apoia-se em IoT, sensores inteligentes e monitoramento climático aplicado a ambientes tecnológicos. Temperatura, umidade, CO2 e material particulado são variáveis relevantes para conforto humano, vida útil de equipamentos e eficiência operacional.",
+    "Na aplicação desenvolvida, a arquitetura segue o fluxo: Sensores IoT -> ESP32 -> MQTT Broker -> Ingestor Python -> PostgreSQL -> API/Dashboard. Essa estrutura permite registrar leituras, classificar o ambiente e apresentar alertas para decisão.",
+    "FUNDAMENTAÇÃO TEÓRICA E ARQUITETURA"
+  ],
+  "7": [
+    "A metodologia adotada foi ágil e incremental, organizada pelas etapas ouvir, criar e implementar. O grupo levantou necessidades da empresa, priorizou requisitos, prototipou a solução e validou funcionalidades com base em feedback.",
+    "METODOLOGIA E TECNOLOGIAS",
+    "Entrevistas e observação do ambiente corporativo.",
+    "Definição de requisitos funcionais e não funcionais.",
+    "Arquitetura com FastAPI, PostgreSQL, SQLAlchemy, Pydantic e Docker Compose.",
+    "Ingestão MQTT com Mosquitto e paho-mqtt.",
+    "Dashboard protegido por autenticação JWT.",
+    "Histórico paginado, alertas, gráfico de horários críticos e simulador de massa histórica.",
+    "Testes automatizados dos endpoints principais.",
+    "Validação e ajustes para evolução contínua do protótipo."
+  ],
+  "8": [
+    "O protótipo funcional já permite cadastrar e consultar leituras ambientais, visualizar métricas atuais, acompanhar histórico e identificar alertas. A classificação automática considera temperatura, umidade, CO2 e PM2.5, adotando o pior status entre ideal, aceitável, alerta e crítico. O dashboard apresenta status geral, recomendações, últimas leituras, gráficos e atualização de dados simulados. Os resultados preliminares indicam viabilidade para apoiar conforto térmico, manutenção preventiva e decisões de climatização.",
+    "RESULTADOS PRELIMINARES"
+  ],
+  "9": [
+    "Obrigado",
+    "!"
+  ]
+}

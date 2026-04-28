@@ -212,6 +212,23 @@ function buildPeriodUrl(baseUrl, startId, endId, deviceId, pagination, alertType
   return `${baseUrl}?${params.toString()}`;
 }
 
+function ensureAccessTokenCookie() {
+  const token = getAccessToken();
+  if (!token) return;
+  document.cookie = `access_token=${token}; Max-Age=${8 * 60 * 60}; path=/; SameSite=Lax`;
+}
+
+function startBrowserDownload(url) {
+  ensureAccessTokenCookie();
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "";
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 function validateDateRange(startId, endId) {
   const start = document.getElementById(startId).value;
   const end = document.getElementById(endId).value;
@@ -613,6 +630,30 @@ async function loadReadingsHistory() {
   }
 }
 
+async function exportReadingsReport() {
+  validateDateRange("readingsStart", "readingsEnd");
+  const button = document.getElementById("exportReadingsReport");
+  button.disabled = true;
+  button.textContent = "Gerando...";
+  try {
+    const url = buildPeriodUrl(
+      "/api/readings/history/export",
+      "readingsStart",
+      "readingsEnd",
+      "readingsDevice",
+      null,
+      null,
+      "readingsStatus",
+    );
+    startBrowserDownload(url);
+  } finally {
+    window.setTimeout(() => {
+      button.disabled = false;
+      button.textContent = "Exportar Relatorio";
+    }, 1000);
+  }
+}
+
 async function loadAlertsHistory() {
   const state = paginationState.alerts;
   try {
@@ -670,6 +711,29 @@ async function loadAlertsHistory() {
     if (requestId === state.requestId) {
       state.isLoading = false;
     }
+  }
+}
+
+async function exportAlertsReport() {
+  validateDateRange("alertsStart", "alertsEnd");
+  const button = document.getElementById("exportAlertsReport");
+  button.disabled = true;
+  button.textContent = "Gerando...";
+  try {
+    const url = buildPeriodUrl(
+      "/api/readings/alerts/export",
+      "alertsStart",
+      "alertsEnd",
+      "alertsDevice",
+      null,
+      "alertsType",
+    );
+    startBrowserDownload(url);
+  } finally {
+    window.setTimeout(() => {
+      button.disabled = false;
+      button.textContent = "Exportar Relatorio";
+    }, 1000);
   }
 }
 
@@ -738,6 +802,14 @@ document.getElementById("applyReadingsFilter").addEventListener("click", () => {
   loadReadingsHistory().catch(console.error);
 });
 
+document.getElementById("exportReadingsReport").addEventListener("click", () => {
+  exportReadingsReport().catch((error) => {
+    document.getElementById("allReadingsTable").innerHTML =
+      `<tr><td colspan="10">Erro ao exportar relatorio: ${error.message}</td></tr>`;
+    console.error(error);
+  });
+});
+
 document.getElementById("readingsStatus").addEventListener("change", () => {
   paginationState.readings.page = 1;
   loadReadingsHistory().catch(console.error);
@@ -746,6 +818,14 @@ document.getElementById("readingsStatus").addEventListener("change", () => {
 document.getElementById("applyAlertsFilter").addEventListener("click", () => {
   paginationState.alerts.page = 1;
   loadAlertsHistory().catch(console.error);
+});
+
+document.getElementById("exportAlertsReport").addEventListener("click", () => {
+  exportAlertsReport().catch((error) => {
+    document.getElementById("alertsTable").innerHTML =
+      `<tr><td colspan="9">Erro ao exportar relatorio: ${error.message}</td></tr>`;
+    console.error(error);
+  });
 });
 
 document.getElementById("alertsType").addEventListener("change", () => {
