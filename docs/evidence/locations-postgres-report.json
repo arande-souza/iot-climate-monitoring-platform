@@ -1,0 +1,13 @@
+{
+  "result": "passed",
+  "database": "PostgreSQL local",
+  "historical_readings_verified": 229947,
+  "historical_fingerprint_unchanged": true,
+  "consolidated_samples_30_days": 86301,
+  "consolidated_points": 361,
+  "alerts": 21408,
+  "critical": 8128,
+  "structured_location_fields_available": true,
+  "connectivity_inferred": false,
+  "backup": "backups/iot_before_locations_20261028.dump"
+}

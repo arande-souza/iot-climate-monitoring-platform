@@ -1,0 +1,16 @@
+{
+  "rooms": [
+    {
+      "name": "Sala 1",
+      "scenarios": 17
+    },
+    {
+      "name": "Sala 2",
+      "scenarios": 17
+    }
+  ],
+  "comparison": "passed",
+  "print_report": "passed",
+  "preserved_readings": 230186,
+  "total_scenarios": 34
+}

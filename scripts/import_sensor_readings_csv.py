@@ -5,6 +5,8 @@ from pathlib import Path
 
 from app.database import Base, SessionLocal, engine
 from app.models.sensor_reading import SensorReading
+from app.services.room_service import ensure_device_room
+from app.services.storage_service import initialize_storage
 
 STATUS_MAP = {
     "normal": "ideal",
@@ -46,6 +48,7 @@ def iter_csv_rows(csv_path: Path):
             yield {
                 "device_id": row["device_id"].strip(),
                 "location": row["location"].strip(),
+                "data_source": row.get("data_source") or "unknown",
                 "temperature": parse_float(row["temperature"]),
                 "humidity": parse_float(row["humidity"]),
                 "pressure": parse_float(row.get("pressure")),
@@ -58,13 +61,21 @@ def iter_csv_rows(csv_path: Path):
 
 
 def import_csv(csv_path: Path, batch_size: int) -> int:
-    Base.metadata.create_all(bind=engine)
+    initialize_storage()
     db = SessionLocal()
     total = 0
     batch = []
+    device_rooms = {}
 
     try:
         for row in iter_csv_rows(csv_path):
+            if row["data_source"] not in {"simulation", "sensor", "external_api", "unknown"}:
+                raise ValueError("Origem de dados invalida no CSV")
+            if row["device_id"] not in device_rooms:
+                device_rooms[row["device_id"]] = ensure_device_room(
+                    db, row["device_id"], row["location"], row["data_source"],
+                ).id
+            row["room_id"] = device_rooms[row["device_id"]]
             batch.append(row)
             if len(batch) >= batch_size:
                 db.bulk_insert_mappings(SensorReading, batch)

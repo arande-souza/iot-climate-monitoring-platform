@@ -33,9 +33,7 @@ class SimulatorGenerateResponse(BaseModel):
     profile: SimulatorProfile
 
 
-class SimulatorUpdateUntilNowRequest(BaseModel):
-    device_id: str = Field(..., min_length=1, max_length=80)
-    location: str = Field(..., min_length=1, max_length=120)
+class SimulatorUpdateOptions(BaseModel):
     frequency_seconds: int = Field(default=60, gt=0)
     profile: SimulatorProfile = "mixed"
 
@@ -47,8 +45,30 @@ class SimulatorUpdateUntilNowRequest(BaseModel):
         return value
 
 
+class SimulatorUpdateUntilNowRequest(SimulatorUpdateOptions):
+    device_id: str = Field(..., min_length=1, max_length=80)
+    location: str = Field(..., min_length=1, max_length=120)
+
+
+class SimulatorUpdateAllRequest(SimulatorUpdateOptions):
+    pass
+
+
 class SimulatorUpdateUntilNowResponse(BaseModel):
     message: str
     start_datetime: datetime | None = None
     end_datetime: datetime | None = None
     total_generated: int = 0
+
+
+class SimulatorRoomUpdate(SimulatorUpdateUntilNowResponse):
+    room_id: str
+    name: str
+
+
+class SimulatorUpdateAllResponse(BaseModel):
+    message: str
+    total_rooms: int
+    updated_rooms: int
+    total_generated: int
+    rooms: list[SimulatorRoomUpdate]

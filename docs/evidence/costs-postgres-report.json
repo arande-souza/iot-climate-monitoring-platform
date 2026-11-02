@@ -1,0 +1,14 @@
+{
+  "result": "passed",
+  "database": "PostgreSQL local",
+  "preserved_readings": 230090,
+  "preserved_rooms": 2,
+  "reading_fingerprint_unchanged": true,
+  "room_fingerprint_unchanged": true,
+  "cost_table_created": true,
+  "financial_scenarios_seeded": false,
+  "scenario_count": 0,
+  "active_rooms_checked": 2,
+  "legacy_history_endpoints": "passed",
+  "backup": "backups/iot_before_costs_20261028.dump"
+}

@@ -1,0 +1,34 @@
+.cost-panel, .cost-context { background: #fff; border: 1px solid #dfe6ef; border-radius: 14px; padding: 22px; min-width: 0; }
+.cost-disclaimer { display: flex; align-items: flex-start; gap: 12px; background: #e5f3ef; color: #174a40; border-left: 3px solid #0f766e; padding: 16px; line-height: 1.6; margin: 0; }
+.cost-disclaimer .icon { margin-top: 4px; }
+.cost-context { display: flex; gap: 18px; justify-content: space-between; align-items: center; }
+.cost-context button { flex-shrink: 0; }
+#costLabelFields { border: 1px solid #bdcadb; border-radius: 10px; padding: 16px; }
+#costLabelFields[hidden], #costResults[hidden], #costChartsPanel[hidden] { display: none; }
+.cost-panel caption { text-align: left; color: #526173; padding: 12px 0; }
+.cost-legend { display: flex; flex-wrap: wrap; gap: 20px; color: #244159; margin: 10px 0; }
+.cost-legend span::before { content: ''; display: inline-block; width: 18px; height: 4px; background: var(--series-color); margin-right: 8px; vertical-align: middle; }
+#costScenarioTable small { display: block; color: #526173; margin-top: 4px; }
+#costScenarioTable input { width: 18px; height: 18px; accent-color: #0f766e; }
+#costResults .overview-metrics { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+#costScenarioTable .room-actions { border: 0; margin: 0; padding: 0; }
+@media (max-width: 620px) { .cost-panel, .cost-context { padding: 16px; } .cost-context { flex-direction: column; align-items: stretch; } #costResults .overview-metrics { grid-template-columns: 1fr 1fr; } }
+#costsView .cost-panel h2 { display: flex; align-items: center; gap: 10px; }
+#costResults .overview-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#costsView .summary-card { min-width: 0; }
+#costsView .summary-card strong { font-size: clamp(1.1rem, 1.6vw, 1.65rem); overflow-wrap: anywhere; }
+#costsView .summary-card:nth-child(-n+4) { border-top: 3px solid #0f766e; }
+#costsView label input, #costsView label select { max-width: 100%; }
+.cost-breakdown { padding: 14px 0; border-top: 1px solid #dfe6ef; }
+.cost-stacked-bar { display: flex; height: 22px; overflow: hidden; border-radius: 6px; background: #edf2f7; }
+.cost-stacked-bar span { min-width: 0; transition: width .2s ease; }
+.cost-breakdown-values { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.cost-breakdown-values dt { color: #526173; } .cost-breakdown-values dd { margin: 6px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.cost-room-bar { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin: 18px 0; }
+.cost-room-bar > div { grid-column: 1 / -1; border-radius: 6px; height: 20px; background: #edf2f7; overflow: hidden; }
+.cost-room-bar > div > span { display: block; height: 100%; background: #0f766e; transition: width .2s ease; }
+#costWinner { margin: 18px 0; } #costAnalysis { line-height: 1.9; }
+#costCompareTable th { min-width: 160px; } #costCompareTable td { min-width: 140px; }
+@media (max-width: 1000px) { #costResults .overview-metrics, #costClimateMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .cost-breakdown-values { grid-template-columns: repeat(2, minmax(0, 1fr)); } #costsView .room-actions { flex-wrap: wrap; } #costsView .section-heading { flex-wrap: wrap; } }
+@media (prefers-reduced-motion: reduce) { .cost-stacked-bar span, .cost-room-bar > div > span { transition: none; } }

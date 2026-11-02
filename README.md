@@ -8,6 +8,18 @@ O projeto usa FastAPI, PostgreSQL, SQLAlchemy, Pydantic, paho-mqtt, Docker Compo
 
 ## Funcionalidades
 
+- **Custos e Investimentos**: cenários por sala, recálculo automático por potência média ou referência de etiqueta, manutenção opcional, comparação, projeções em 12/24/36 meses, distribuição por sala, indicadores ambientais e análise determinística. Exportação CSV e relatório com gráficos para impressão/PDF. Os resultados são estimativas; preços, consumo, uso e tarifa são informados pelo usuário. [Metodologia e instruções](docs/CUSTOS_E_INVESTIMENTOS.md).
+
+- Gerenciamento dinâmico de salas, com cadastro, edição, exclusão confirmada e limites de temperatura/umidade por ambiente.
+- Visão geral com indicadores e cards, página individual e comparação entre todas as salas cadastradas.
+- Origem de cada leitura identificada como sensor, simulação, meteorologia externa ou desconhecida.
+- Gráficos individuais e comparação com filtros de 24 horas, 7 dias e 30 dias.
+- Cadastro com identificação do ambiente, cidade/UF, localização interna e dispositivo associado, preservando o texto das medições antigas.
+- Gráficos consolidados de temperatura/umidade médias e ocorrências de alerta/críticas, com filtro por sala e período personalizado.
+- Indicadores atuais de pressão, CO₂, PM2.5 e PM10 no ambiente individual, com ícones SVG locais.
+
+Documentação da evolução do Projeto Integrador VI, migração, testes e evidências: [docs/EVOLUCAO_PI_VI.md](docs/EVOLUCAO_PI_VI.md).
+
 - API REST para cadastrar e consultar leituras ambientais.
 - Ingestão MQTT no tópico configurável `climate/readings`.
 - Classificação automática do ambiente: `ideal`, `aceitavel`, `alerta` ou `critico`.
@@ -90,7 +102,57 @@ mosquitto_pub -h localhost -p 1883 -t climate/readings -m '{
 }'
 ```
 
+## Monitorar duas ou mais salas
+
+O dashboard abre na visão geral com todas as salas cadastradas. Use **Nova sala** ou **Gerenciar salas** para cadastrar ambientes, editar seus limites ou excluí-los mediante confirmação. A migração preserva Sala 1, Sala 2 e suas leituras existentes. O seletor **Sala / dispositivo** e os cards dão acesso ao dashboard individual; **Comparar ambientes** inclui automaticamente todas as salas ativas.
+
+Métricas, status, gráficos, históricos, alertas e relatórios CSV respeitam a sala selecionada. Uma sala sem leituras mostra os indicadores vazios. Na **Visão Geral**, a seção **Coleta de dados**, com o subtítulo **Área de atualização manual**, oferece o botão **Atualizar dados**. Ele gera novas leituras para todas as salas ativas, mantendo a continuidade do histórico de cada ambiente. A interface usa textos neutros; o mecanismo continua sendo o gerador existente e preserva `data_source=simulation` nas novas leituras para auditoria. Leituras com mais de 30 minutos são sinalizadas como desatualizadas e não entram nas médias atuais da visão geral.
+
+Para coletar dados reais da segunda sala, configure outro ESP32 para publicar no mesmo broker e tópico `climate/readings`, usando um identificador exclusivo:
+
+```json
+{
+  "device_id": "esp32-sala-02",
+  "location": "Sala 2",
+  "temperature": 24.1,
+  "humidity": 51.0,
+  "pressure": 1012.4,
+  "co2": 780,
+  "pm25": 9.2,
+  "pm10": 18.3
+}
+```
+
+Esse mesmo JSON pode ser enviado para `POST /api/readings` com autenticação. Mantenha o `device_id` da sala 1 e seus dados existentes; cada sala deve usar seu próprio identificador. O campo `location` informa o nome do ambiente. Nesta versão, o painel identifica cada sala por um dispositivo.
+
+Novas salas cadastradas aparecem imediatamente nos dashboards, mesmo sem medições. Para preservar a integração existente, dispositivos novos recebidos por MQTT/API também são cadastrados automaticamente. Sala 1 e Sala 2 são criadas na primeira migração; excluí-las não faz com que reapareçam após reiniciar. O simulador usa o local cadastrado da sala.
+
+A aplicação aplica automaticamente uma migração aditiva ao iniciar: cria o cadastro de salas e adiciona vínculo e origem às leituras, preservando os valores anteriores. O broker continua o mesmo. A coleta real depende da configuração e conexão do ESP32; o botão do dashboard é um simulador. APIs meteorológicas externas podem ser identificadas no cadastro e nos payloads; não existe consulta automática a esses serviços.
+
+### Limpar as leituras e definir uma nova data inicial
+
+Para conferir o período e a quantidade de registros antes de alterar o banco:
+
+```powershell
+docker compose exec -T app python -m scripts.reset_simulated_readings --start 2026-08-10T00:00:00-03:00
+```
+
+Para aplicar a substituição:
+
+```powershell
+docker compose exec -T app python -m scripts.reset_simulated_readings --start 2026-08-10T00:00:00-03:00 --apply
+```
+
+**Esse comando substitui todas as leituras existentes** por dados simulados da Sala 1 e da Sala 2. Antes da exclusão, salva um CSV com todas as leituras em `backups/` na pasta do projeto. A exclusão e a geração são feitas na mesma transação: se houver falha, o banco mantém os dados anteriores.
+
+A data usa o formato ISO 8601; `-03:00` indica o horário de Brasília. O período termina no momento da execução, com uma leitura por minuto e perfil `mixed`. Para mudar o término ou intervalo, use `--end 2026-08-11T00:00:00-03:00` e `--frequency-seconds 300`, por exemplo. A geração ocorre em lotes, permitindo períodos com mais de 100.000 registros por sala.
+
+Depois, recarregue o dashboard. O botão **Atualizar dados** continua da última leitura da sala selecionada.
+
 ## Endpoints principais
+
+- `GET /api/readings/devices` lista os dispositivos e o local da leitura mais recente de cada um.
+- `latest`, `status` e `summary` aceitam `?device_id=esp32-sala-02`, assim como os filtros de histórico, alertas, horários críticos, período e exportações.
 
 - `POST /api/readings` recebe uma leitura manual.
 - `GET /api/readings/latest?limit=20` lista as últimas leituras.

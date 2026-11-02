@@ -2,6 +2,9 @@ import csv
 import os
 from datetime import datetime, timedelta, timezone
 from io import StringIO
+from types import SimpleNamespace
+import json
+import pytest
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_iot_climate.db"
 os.environ["MQTT_ENABLED"] = "false"
@@ -52,6 +55,144 @@ def sample_payload(device_id: str = "esp32-sala-01") -> dict:
         "pm25": 8.5,
         "pm10": 18.3,
     }
+
+
+def test_rooms_keep_dashboard_history_alerts_and_exports_separate():
+    with authenticated_client() as client:
+        for device_id, location, profile, day in [
+            ("esp32-sala-01", "Sala 1", "normal", "01"),
+            ("esp32-sala-02", "Sala 2", "critical", "02"),
+        ]:
+            response = client.post("/simulator/generate", json={
+                "device_id": device_id,
+                "location": location,
+                "profile": profile,
+                "start_datetime": f"2026-10-{day}T12:00:00Z",
+                "end_datetime": f"2026-10-{day}T12:02:00Z",
+                "frequency_seconds": 60,
+            })
+            assert response.status_code == 200
+
+        devices = client.get("/api/readings/devices")
+        assert devices.status_code == 200
+        assert devices.json() == [
+            {"device_id": "esp32-sala-01", "location": "Sala 1"},
+            {"device_id": "esp32-sala-02", "location": "Sala 2"},
+        ]
+        params = {"device_id": "esp32-sala-01"}
+        latest = client.get("/api/readings/latest", params=params).json()
+        assert len(latest) == 3
+        assert all(row["device_id"] == params["device_id"] for row in latest)
+        status = client.get("/api/readings/status", params=params).json()
+        assert status["status"] == "ideal"
+        assert status["latest_reading"]["device_id"] == params["device_id"]
+        assert client.get("/api/readings/summary", params=params).json()["total_readings"] == 3
+        assert client.get("/api/readings/summary").json()["total_readings"] == 6
+        date_range = client.get("/api/readings/range", params=params).json()
+        assert date_range["start_datetime"].startswith("2026-10-01T12:00:00")
+        assert date_range["end_datetime"].startswith("2026-10-01T12:02:00")
+        history = client.get("/api/readings/history", params=params).json()
+        assert history["total"] == 3
+        assert all(row["device_id"] == params["device_id"] for row in history["items"])
+        assert client.get("/api/readings/alerts", params=params).json()["total"] == 0
+        hours = client.get("/api/readings/alerts/critical-hours", params=params).json()
+        assert sum(hour["total"] for hour in hours) == 0
+        for path in ["history/export", "alerts/export"]:
+            export = client.get(f"/api/readings/{path}", params=params)
+            assert export.status_code == 200
+            assert "esp32-sala-02" not in export.text
+        room2 = {"device_id": "esp32-sala-02"}
+        assert client.get("/api/readings/alerts", params=room2).json()["total"] > 0
+        assert "esp32-sala-02" in client.get("/api/readings/alerts/export", params=room2).text
+
+        empty = {"device_id": "sala-sem-dados"}
+        assert client.get("/api/readings/status", params=empty).json()["latest_reading"] is None
+        assert client.get("/api/readings/latest", params=empty).json() == []
+        assert client.get("/api/readings/summary", params=empty).json()["total_readings"] == 0
+
+
+def test_second_room_simulation_uses_its_own_last_reading():
+    with authenticated_client() as client:
+        client.post("/api/readings", json=sample_payload("esp32-sala-01"))
+        response = client.post("/simulator/update-until-now", json={
+            "device_id": "esp32-sala-02",
+            "location": "Sala 2",
+            "frequency_seconds": 3600,
+            "profile": "normal",
+        })
+        assert response.status_code == 200
+        assert response.json()["total_generated"] == 25
+        assert client.get("/api/readings/summary", params={
+            "device_id": "esp32-sala-01",
+        }).json()["total_readings"] == 1
+        again = client.post("/simulator/update-until-now", json={
+            "device_id": "esp32-sala-02", "location": "Sala 2",
+            "frequency_seconds": 3600, "profile": "normal",
+        })
+        assert again.json()["total_generated"] == 0
+
+
+def test_mqtt_accepts_two_rooms_on_same_topic():
+    from app.services.mqtt_service import _on_message
+
+    for device_id, location in [("esp32-sala-01", "Sala 1"), ("esp32-sala-02", "Sala 2")]:
+        payload = {**sample_payload(device_id), "location": location}
+        _on_message(None, None, SimpleNamespace(
+            topic="climate/readings", payload=json.dumps(payload).encode("utf-8"),
+        ))
+    with authenticated_client() as client:
+        for device_id in ["esp32-sala-01", "esp32-sala-02"]:
+            readings = client.get("/api/readings/latest", params={"device_id": device_id}).json()
+            assert len(readings) == 1
+            assert readings[0]["device_id"] == device_id
+
+
+def test_rebuild_readings_backs_up_and_replaces_both_rooms(tmp_path):
+    from scripts.reset_simulated_readings import rebuild_readings, parse_datetime
+
+    with authenticated_client() as client:
+        old = client.post("/api/readings", json=sample_payload("old-device")).json()
+        start = parse_datetime("2026-08-10T00:00:00-03:00")
+        end = start + timedelta(minutes=2)
+        preview = rebuild_readings(start, end, backup_dir=tmp_path)
+        assert preview["previous"] == 1
+        assert not list(tmp_path.iterdir())
+        result = rebuild_readings(start, end, backup_dir=tmp_path, apply=True)
+        assert result["per_room"] == 3
+        with result["backup"].open(encoding="utf-8-sig", newline="") as backup:
+            rows = list(csv.DictReader(backup))
+        assert len(rows) == 1
+        assert rows[0]["device_id"] == "old-device"
+        assert int(rows[0]["id"]) == old["id"]
+        assert client.get("/api/readings/summary").json()["total_readings"] == 6
+        assert client.get("/api/readings/latest", params={"device_id": "old-device"}).json() == []
+        for device_id in ["esp32-sala-01", "esp32-sala-02"]:
+            history = client.get("/api/readings/history", params={"device_id": device_id}).json()
+            assert history["total"] == 3
+
+
+def test_rebuild_readings_rolls_back_on_generation_failure(tmp_path, monkeypatch):
+    from scripts import reset_simulated_readings as reset
+
+    original_generate_values = reset.generate_values
+    calls = 0
+
+    def fail_generation(*args):
+        nonlocal calls
+        calls += 1
+        if calls > 3:
+            raise RuntimeError("generation failed")
+        return original_generate_values(*args)
+
+    with authenticated_client() as client:
+        client.post("/api/readings", json=sample_payload("old-device"))
+        start = reset.parse_datetime("2026-08-10T00:00:00-03:00")
+        monkeypatch.setattr(reset, "generate_values", fail_generation)
+        with pytest.raises(RuntimeError, match="generation failed"):
+            reset.rebuild_readings(start, start + timedelta(minutes=2), backup_dir=tmp_path, apply=True)
+        assert client.get("/api/readings/summary").json()["total_readings"] == 1
+        assert client.get("/api/readings/latest").json()[0]["device_id"] == "old-device"
+        assert len(list(tmp_path.glob("*.csv"))) == 1
 
 
 def test_health_is_public_and_api_requires_authentication():

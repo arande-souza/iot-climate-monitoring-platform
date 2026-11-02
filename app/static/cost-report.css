@@ -1,0 +1,8 @@
+body { margin: 0; background: #f3f6fa; color: #24364a; font: 15px/1.6 system-ui, sans-serif; }
+main { max-width: 1000px; margin: 24px auto; padding: 32px; background: white; }
+h1,h2,h3 { color: #12344d; } h2 { margin-top: 32px; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; } th,td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; overflow-wrap: anywhere; } th { background: #eef6f5; }
+svg { width: 100%; height: auto; } .notice { padding: 16px; background: #e5f3ef; border-left: 4px solid #0f766e; }
+button { background: #0f766e; color: white; padding: 12px 20px; border: 0; border-radius: 8px; cursor: pointer; }
+p { overflow-wrap: anywhere; } @media print { body { background: white; font-size: 11px; } main { margin: 0; padding: 0; max-width: none; } .print-toolbar { display: none; } tr, svg { break-inside: avoid; } thead { display: table-header-group; } a { color: inherit; } }
+@media (max-width: 600px) { main { padding: 16px; margin: 0; } table { font-size: 12px; } }

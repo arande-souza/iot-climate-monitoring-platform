@@ -8,10 +8,15 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.database import Base, engine
+from app.database import get_db
+from sqlalchemy.orm import Session
 from app.routes.auth_routes import router as auth_router
 from app.routes.sensor_routes import router as sensor_router
 from app.routes.simulator_routes import router as simulator_router
+from app.routes.room_routes import router as room_router
+from app.routes.cost_routes import router as cost_router
+from app.services.storage_service import initialize_storage
+from app.services.room_service import get_room
 from app.security.auth import require_jwt_middleware, verify_token
 from app.services.mqtt_service import start_mqtt_service, stop_mqtt_service
 
@@ -24,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    initialize_storage()
     start_mqtt_service()
     logger.info("Application started")
     try:
@@ -51,6 +56,8 @@ templates = Jinja2Templates(directory="app/templates")
 app.include_router(auth_router)
 app.include_router(sensor_router, dependencies=[Depends(verify_token)])
 app.include_router(simulator_router, dependencies=[Depends(verify_token)])
+app.include_router(room_router, dependencies=[Depends(verify_token)])
+app.include_router(cost_router, dependencies=[Depends(verify_token)])
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -66,6 +73,15 @@ def dashboard(request: Request, username: str = Depends(verify_token)):
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard_alias(request: Request, username: str = Depends(verify_token)):
     return dashboard(request, username)
+
+
+@app.get("/rooms/{room_id}", response_class=HTMLResponse)
+def room_page(
+    room_id: str, request: Request,
+    username: str = Depends(verify_token), db: Session = Depends(get_db),
+):
+    room = get_room(db, room_id)
+    return templates.TemplateResponse("dashboard.html", {"request": request, "initial_room_id": room.id})
 
 
 @app.get("/health")

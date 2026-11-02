@@ -42,6 +42,8 @@ def _on_message(client: mqtt.Client, userdata, message: mqtt.MQTTMessage):
 
     try:
         data = json.loads(raw_payload)
+        if isinstance(data, dict):
+            data.setdefault("data_source", "sensor")
         payload = SensorReadingCreate.model_validate(data)
     except json.JSONDecodeError:
         logger.exception("Invalid MQTT JSON payload")

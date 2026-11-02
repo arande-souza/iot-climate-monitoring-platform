@@ -5,6 +5,8 @@ from app.database import Base, SessionLocal, engine
 from app.models.sensor_reading import SensorReading
 from app.schemas.sensor_reading_schema import SensorReadingCreate
 from app.services.classification_service import classify_environment
+from app.services.room_service import ensure_device_room
+from app.services.storage_service import initialize_storage
 
 DEVICES = [
     ("esp32-sala-01", "Sala de TI"),
@@ -18,6 +20,7 @@ def make_payload(index: int) -> SensorReadingCreate:
     return SensorReadingCreate(
         device_id=device_id,
         location=location,
+        data_source="simulation",
         temperature=round(uniform(20.5, 27.8), 1),
         humidity=round(uniform(34.0, 68.0), 1),
         pressure=round(uniform(1008.0, 1018.0), 1),
@@ -28,15 +31,17 @@ def make_payload(index: int) -> SensorReadingCreate:
 
 
 def main() -> None:
-    Base.metadata.create_all(bind=engine)
+    initialize_storage()
     db = SessionLocal()
     try:
         base_time = datetime.now(timezone.utc) - timedelta(hours=6)
         for index in range(72):
             payload = make_payload(index)
+            room = ensure_device_room(db, payload.device_id, payload.location, "simulation")
             reading = SensorReading(
                 **payload.model_dump(),
-                air_quality_status=classify_environment(payload),
+                room_id=room.id,
+                air_quality_status=classify_environment(payload, room),
                 created_at=base_time + timedelta(minutes=index * 5),
             )
             db.add(reading)

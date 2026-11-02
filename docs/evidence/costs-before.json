@@ -1,0 +1,12 @@
+{
+  "readings": {
+    "count": 230090,
+    "fingerprint": "78cbcb5d82a814b287ff6175a651d0fb"
+  },
+  "maximum_reading_id": 294880,
+  "rooms": {
+    "count": 2,
+    "fingerprint": "625e2cefda6a9b9fb4592ba79da9af4e"
+  },
+  "existing_scenarios": 0
+}

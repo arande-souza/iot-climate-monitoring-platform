@@ -1,5 +1,5 @@
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,12 +9,14 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.sensor_reading import SensorReading
+from app.models.room import Room
 from app.schemas.sensor_reading_schema import (
     EnvironmentStatus,
     CriticalHourCount,
     PaginatedSensorReadings,
     SensorReadingCreate,
     SensorReadingResponse,
+    SensorDevice,
     ReadingsDateRange,
     ReadingsSummary,
 )
@@ -22,6 +24,7 @@ from app.services.classification_service import (
     build_recommendations,
     classify_environment,
 )
+from app.services.room_service import ensure_device_room, get_room
 
 router = APIRouter(prefix="/api/readings", tags=["sensor readings"])
 ALLOWED_PAGE_SIZES = {20, 50, 100, 200, 500, 1000}
@@ -33,10 +36,18 @@ ALERT_STATUS_VALUES = {
 }
 
 
+def optional_room_id(room_id: str | None = Query(default=None), db: Session = Depends(get_db)):
+    if room_id:
+        get_room(db, room_id)
+    return room_id
+
+
 def create_sensor_reading(db: Session, payload: SensorReadingCreate) -> SensorReading:
+    room = ensure_device_room(db, payload.device_id, payload.location, payload.data_source)
     reading = SensorReading(
         **payload.model_dump(),
-        air_quality_status=classify_environment(payload),
+        room_id=room.id,
+        air_quality_status=classify_environment(payload, room),
     )
     db.add(reading)
     db.commit()
@@ -100,12 +111,14 @@ def parse_optional_datetime(value: str | None, field_name: str) -> datetime | No
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value)
+        return parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed
     except ValueError:
         try:
             normalized_value = value.rsplit(" ", 1)
             if len(normalized_value) == 2:
-                return datetime.fromisoformat("+".join(normalized_value))
+                parsed = datetime.fromisoformat("+".join(normalized_value))
+                return parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed
         except ValueError:
             pass
     raise HTTPException(
@@ -119,6 +132,7 @@ def build_history_conditions(
     end: str | None,
     device_id: str | None,
     status_filter: str | None,
+    room_id: str | None = None,
 ):
     start_datetime = parse_optional_datetime(start, "start")
     end_datetime = parse_optional_datetime(end, "end")
@@ -129,6 +143,8 @@ def build_history_conditions(
         )
 
     conditions = []
+    if room_id:
+        conditions.append(SensorReading.room_id == room_id)
     if start_datetime:
         conditions.append(SensorReading.created_at >= start_datetime)
     if end_datetime:
@@ -146,6 +162,7 @@ def build_alert_conditions(
     end: str | None,
     device_id: str | None,
     alert_type: str | None,
+    room_id: str | None = None,
 ):
     start_datetime = parse_optional_datetime(start, "start")
     end_datetime = parse_optional_datetime(end, "end")
@@ -158,6 +175,8 @@ def build_alert_conditions(
     conditions = [
         SensorReading.air_quality_status.in_(get_alert_status_filter(alert_type)),
     ]
+    if room_id:
+        conditions.append(SensorReading.room_id == room_id)
     if start_datetime:
         conditions.append(SensorReading.created_at >= start_datetime)
     if end_datetime:
@@ -167,14 +186,14 @@ def build_alert_conditions(
     return conditions
 
 
-def build_readings_csv_response(readings, headers: list[str], row_builder, filename: str):
+def build_readings_csv_response(readings, headers: list[str], row_builder, filename: str, include_source=False):
     output = StringIO()
     output.write("\ufeff")
     writer = csv.writer(output)
-    writer.writerow(headers)
+    writer.writerow(headers + (["Origem"] if include_source else []))
 
     for reading in readings:
-        writer.writerow(row_builder(reading))
+        writer.writerow(row_builder(reading) + ([reading.data_source] if include_source else []))
 
     return Response(
         content=output.getvalue(),
@@ -195,14 +214,38 @@ def create_reading(payload: SensorReadingCreate, db: Session = Depends(get_db)):
 @router.get("/latest", response_model=list[SensorReadingResponse])
 def list_latest_readings(
     limit: int = Query(default=20, ge=1, le=200),
+    device_id: str | None = Query(default=None),
+    room_id: str | None = Depends(optional_room_id),
     db: Session = Depends(get_db),
 ):
-    stmt = select(SensorReading).order_by(SensorReading.created_at.desc()).limit(limit)
+    stmt = select(SensorReading)
+    if room_id:
+        stmt = stmt.where(SensorReading.room_id == room_id)
+    if device_id:
+        stmt = stmt.where(SensorReading.device_id == device_id)
+    stmt = stmt.order_by(SensorReading.created_at.desc(), SensorReading.id.desc()).limit(limit)
     return db.scalars(stmt).all()
+
+
+@router.get("/devices", response_model=list[SensorDevice])
+def list_devices(db: Session = Depends(get_db)):
+    ranked = select(
+        SensorReading.device_id,
+        SensorReading.location,
+        func.row_number().over(
+            partition_by=SensorReading.device_id,
+            order_by=(SensorReading.created_at.desc(), SensorReading.id.desc()),
+        ).label("position"),
+    ).subquery()
+    stmt = select(ranked.c.device_id, ranked.c.location).where(
+        ranked.c.position == 1,
+    ).order_by(ranked.c.device_id)
+    return db.execute(stmt).mappings().all()
 
 
 @router.get("/history", response_model=PaginatedSensorReadings)
 def get_history(
+    room_id: str | None = Depends(optional_room_id),
     start: str | None = Query(default=None, description="Data inicial em ISO 8601"),
     end: str | None = Query(default=None, description="Data final em ISO 8601"),
     device_id: str | None = Query(default=None),
@@ -214,7 +257,7 @@ def get_history(
     page_size: int = Query(default=50),
     db: Session = Depends(get_db),
 ):
-    conditions = build_history_conditions(start, end, device_id, status_filter)
+    conditions = build_history_conditions(start, end, device_id, status_filter, room_id)
     stmt = select(SensorReading).where(*conditions).order_by(SensorReading.created_at.asc())
     count_stmt = select(func.count()).select_from(SensorReading).where(*conditions)
     return paginate_readings(db, stmt, count_stmt, page, page_size)
@@ -222,6 +265,8 @@ def get_history(
 
 @router.get("/history/export")
 def export_history_csv(
+    room_id: str | None = Depends(optional_room_id),
+    include_source: bool = Query(default=False),
     start: str | None = Query(default=None, description="Data inicial em ISO 8601"),
     end: str | None = Query(default=None, description="Data final em ISO 8601"),
     device_id: str | None = Query(default=None),
@@ -231,7 +276,7 @@ def export_history_csv(
     ),
     db: Session = Depends(get_db),
 ):
-    conditions = build_history_conditions(start, end, device_id, status_filter)
+    conditions = build_history_conditions(start, end, device_id, status_filter, room_id)
     stmt = select(SensorReading).where(*conditions).order_by(SensorReading.created_at.asc())
     readings = db.scalars(stmt).all()
     return build_readings_csv_response(
@@ -261,11 +306,13 @@ def export_history_csv(
             reading.air_quality_status,
         ],
         "historico_leituras.csv",
+        include_source,
     )
 
 
 @router.get("/range", response_model=ReadingsDateRange)
 def get_readings_date_range(
+    room_id: str | None = Depends(optional_room_id),
     device_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
@@ -276,6 +323,8 @@ def get_readings_date_range(
     if device_id:
         stmt = stmt.where(SensorReading.device_id == device_id)
 
+    if room_id:
+        stmt = stmt.where(SensorReading.room_id == room_id)
     start_datetime, end_datetime = db.execute(stmt).one()
     return ReadingsDateRange(
         start_datetime=start_datetime,
@@ -284,13 +333,23 @@ def get_readings_date_range(
 
 
 @router.get("/summary", response_model=ReadingsSummary)
-def get_readings_summary(db: Session = Depends(get_db)):
-    total_readings = db.scalar(select(func.count()).select_from(SensorReading)) or 0
+def get_readings_summary(
+    room_id: str | None = Depends(optional_room_id),
+    device_id: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    stmt = select(func.count()).select_from(SensorReading)
+    if room_id:
+        stmt = stmt.where(SensorReading.room_id == room_id)
+    if device_id:
+        stmt = stmt.where(SensorReading.device_id == device_id)
+    total_readings = db.scalar(stmt) or 0
     return ReadingsSummary(total_readings=total_readings)
 
 
 @router.get("/alerts", response_model=PaginatedSensorReadings)
 def get_alert_history(
+    room_id: str | None = Depends(optional_room_id),
     start: str | None = Query(default=None, description="Data inicial em ISO 8601"),
     end: str | None = Query(default=None, description="Data final em ISO 8601"),
     device_id: str | None = Query(default=None),
@@ -299,7 +358,7 @@ def get_alert_history(
     page_size: int = Query(default=50),
     db: Session = Depends(get_db),
 ):
-    conditions = build_alert_conditions(start, end, device_id, alert_type)
+    conditions = build_alert_conditions(start, end, device_id, alert_type, room_id)
     stmt = select(SensorReading).where(*conditions).order_by(SensorReading.created_at.asc())
     count_stmt = select(func.count()).select_from(SensorReading).where(*conditions)
     return paginate_readings(db, stmt, count_stmt, page, page_size)
@@ -307,13 +366,15 @@ def get_alert_history(
 
 @router.get("/alerts/export")
 def export_alerts_csv(
+    room_id: str | None = Depends(optional_room_id),
+    include_source: bool = Query(default=False),
     start: str | None = Query(default=None, description="Data inicial em ISO 8601"),
     end: str | None = Query(default=None, description="Data final em ISO 8601"),
     device_id: str | None = Query(default=None),
     alert_type: str | None = Query(default=None, description="Tipo do alerta: alerta ou critico"),
     db: Session = Depends(get_db),
 ):
-    conditions = build_alert_conditions(start, end, device_id, alert_type)
+    conditions = build_alert_conditions(start, end, device_id, alert_type, room_id)
     stmt = select(SensorReading).where(*conditions).order_by(SensorReading.created_at.asc())
     readings = db.scalars(stmt).all()
     return build_readings_csv_response(
@@ -341,18 +402,20 @@ def export_alerts_csv(
             reading.air_quality_status,
         ],
         "historico_alertas.csv",
+        include_source,
     )
 
 
 @router.get("/alerts/critical-hours", response_model=list[CriticalHourCount])
 def get_critical_hours(
+    room_id: str | None = Depends(optional_room_id),
     start: str | None = Query(default=None, description="Data inicial em ISO 8601"),
     end: str | None = Query(default=None, description="Data final em ISO 8601"),
     device_id: str | None = Query(default=None),
     alert_type: str | None = Query(default=None, description="Tipo do alerta: alerta ou critico"),
     db: Session = Depends(get_db),
 ):
-    conditions = build_alert_conditions(start, end, device_id, alert_type)
+    conditions = build_alert_conditions(start, end, device_id, alert_type, room_id)
     if db.bind and db.bind.dialect.name == "postgresql":
         chart_datetime = func.timezone("America/Sao_Paulo", SensorReading.created_at)
     else:
@@ -406,8 +469,17 @@ def get_readings_by_device(
 
 
 @router.get("/status", response_model=EnvironmentStatus)
-def get_environment_status(db: Session = Depends(get_db)):
-    stmt = select(SensorReading).order_by(SensorReading.created_at.desc()).limit(1)
+def get_environment_status(
+    room_id: str | None = Depends(optional_room_id),
+    device_id: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    stmt = select(SensorReading)
+    if room_id:
+        stmt = stmt.where(SensorReading.room_id == room_id)
+    if device_id:
+        stmt = stmt.where(SensorReading.device_id == device_id)
+    stmt = stmt.order_by(SensorReading.created_at.desc(), SensorReading.id.desc()).limit(1)
     latest = db.scalars(stmt).first()
     if latest is None:
         return EnvironmentStatus(
@@ -415,8 +487,10 @@ def get_environment_status(db: Session = Depends(get_db)):
             latest_reading=None,
             recommendations=["Nenhuma leitura registrada até o momento."],
         )
+    room = db.get(Room, latest.room_id) if latest.room_id else None
+    current_status = classify_environment(latest, room) if room else latest.air_quality_status
     return EnvironmentStatus(
-        status=latest.air_quality_status,
+        status=current_status,
         latest_reading=latest,
-        recommendations=build_recommendations(latest.air_quality_status),
+        recommendations=build_recommendations(current_status),
     )

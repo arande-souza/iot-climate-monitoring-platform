@@ -5,3 +5,4 @@ __pycache__/
 .env
 test_iot_climate.db
 postgres_data/
+backups/

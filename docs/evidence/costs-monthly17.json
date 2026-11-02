@@ -1,0 +1,18 @@
+{
+  "updated": 32,
+  "distribution": "monthly17",
+  "rooms": [
+    {
+      "room": "Sala 1",
+      "count": 17,
+      "first": "Planejamento 06/2025 · Uso reduzido (exemplo)",
+      "last": "Planejamento 10/2026 · Uso intensivo (exemplo)"
+    },
+    {
+      "room": "Sala 2",
+      "count": 17,
+      "first": "Planejamento 06/2025 · Econômico (exemplo)",
+      "last": "Planejamento 10/2026 · Operação contínua (exemplo)"
+    }
+  ]
+}

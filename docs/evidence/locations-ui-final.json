@@ -1,0 +1,9 @@
+{
+  "result": "passed",
+  "checks": [
+    "Structured geographic and internal location in editable form",
+    "Device replacement keeps selected room and individual URL",
+    "Historical device filter survives automatic room refresh"
+  ],
+  "errors": []
+}

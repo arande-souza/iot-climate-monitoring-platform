@@ -1,0 +1,17 @@
+{
+  "server": "http://127.0.0.1:8001",
+  "checks": [
+    "Login and preserved Sala 1 / Sala 2",
+    "Consolidated temperature, humidity and events: existing samples, room filter and empty custom period",
+    "Created Sala 3 through Sala 10 through the UI; automatic overview updates",
+    "Edited name and room-specific threshold",
+    "Individual charts, 24h/7d/30d filters, accessible keyboard exploration and source labels",
+    "Existing reading and alert history pages: filters, pagination, critical-hours chart and CSV downloads",
+    "Comparison includes ten rooms; rooms without data remain explicitly empty",
+    "Deletion requires confirmation and preserves other rooms",
+    "390px mobile overview and individual view without horizontal overflow",
+    "Overview manual update generates readings for every active room with neutral labels"
+  ],
+  "errors": [],
+  "result": "passed"
+}

@@ -1,0 +1,13 @@
+{
+  "server": "http://127.0.0.1:8001",
+  "data": "Valores exclusivos de testes em base isolada",
+  "checks": [
+    "Sala 1: blank initial prices; power and label methods; preview; persistence; comparison at 12/24/36 months; keyboard charts and CSV",
+    "Responsive module at 390px without horizontal page overflow",
+    "Sala 2: room selection stays in module; independent saved scenario; links to and from individual dashboard",
+    "Edit, cancel/confirm deletion, persistence across reload and preservation of rooms and readings",
+    "Evolution: automatic preview without autosave; maintenance; common/individual tariffs and winner; one scenario per room; no invented duration; printable graph report and PDF; responsive results"
+  ],
+  "errors": [],
+  "result": "passed"
+}

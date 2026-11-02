@@ -141,6 +141,23 @@ select {
   align-items: center;
   display: flex;
   gap: 14px;
+  flex-wrap: wrap;
+}
+
+.room-control {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  max-width: 100%;
+}
+
+.room-control select {
+  background: #fff;
+  border: 1px solid #cbd7e5;
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  max-width: 100%;
 }
 
 .sidebar-footer {

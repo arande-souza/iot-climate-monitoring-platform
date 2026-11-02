@@ -1,0 +1,18 @@
+{
+  "result": "passed",
+  "checks": [
+    {
+      "room": "Sala 1",
+      "saved_scenarios": 17,
+      "automatic_summary": true,
+      "four_values_match_api": true
+    },
+    {
+      "room": "Sala 2",
+      "saved_scenarios": 17,
+      "automatic_summary": true,
+      "four_values_match_api": true
+    }
+  ],
+  "errors": []
+}

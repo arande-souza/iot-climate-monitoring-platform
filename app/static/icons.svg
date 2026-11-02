@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="building" viewBox="0 0 24 24"><path d="M4 21V5l8-3 8 3v16M2 21h20M10 21v-5h4v5M8 7h1m6 0h1M8 11h1m6 0h1"/></symbol>
+  <symbol id="door" viewBox="0 0 24 24"><path d="M4 21h16M6 21V3h12v18M14 12h.01"/></symbol>
+  <symbol id="chart" viewBox="0 0 24 24"><path d="M3 3v18h18M6 15l4-5 4 3 6-8"/></symbol>
+  <symbol id="bars" viewBox="0 0 24 24"><path d="M3 3v18h18M7 17v-5m5 5V6m5 11V9"/></symbol>
+  <symbol id="bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+  <symbol id="temperature" viewBox="0 0 24 24"><path d="M9 14.5V5a3 3 0 0 1 6 0v9.5a5 5 0 1 1-6 0M12 7v11M18 6h3m-3 4h2"/><circle cx="12" cy="18" r="1"/></symbol>
+  <symbol id="droplet" viewBox="0 0 24 24"><path d="M12 2C9 7 5 10 5 15a7 7 0 0 0 14 0c0-5-4-8-7-13ZM8 15a4 4 0 0 0 4 4"/></symbol>
+  <symbol id="air" viewBox="0 0 24 24"><path d="M3 8h12a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h5a3 3 0 1 1-3 3"/></symbol>
+  <symbol id="alert" viewBox="0 0 24 24"><path d="m12 3 10 18H2L12 3ZM12 9v5m0 3h.01"/></symbol>
+  <symbol id="chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 2v4m6-4v4M9 18v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4"/></symbol>
+  <symbol id="map-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+  <symbol id="pressure" viewBox="0 0 24 24"><path d="M4 19a10 10 0 1 1 16 0M12 12l4-5M5 12H3m9-9V2m7 10h2"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="particles" viewBox="0 0 24 24"><circle cx="6" cy="7" r="3"/><circle cx="17" cy="6" r="2"/><circle cx="14" cy="16" r="4"/><path d="M4 18h.01M21 13h.01"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
+  <symbol id="filter" viewBox="0 0 24 24"><path d="M3 4h18l-7 8v7l-4 2v-9L3 4Z"/></symbol>
+  <symbol id="calculator" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 6h8M8 11h1m6 0h1m-8 4h1m6 0h1m-8 4h1m6 0h1"/></symbol>
+  <symbol id="energy" viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 10-12h-7l1-8Z"/></symbol>
+  <symbol id="wallet" viewBox="0 0 24 24"><path d="M20 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M20 12h-6v5h6m-3-2.5h.01"/></symbol>
+</svg>

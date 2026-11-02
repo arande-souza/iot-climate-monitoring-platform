@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from random import gauss, random, uniform
 
 from sqlalchemy.orm import Session
@@ -7,6 +7,7 @@ from app.models.sensor_reading import SensorReading
 from app.schemas.sensor_reading_schema import SensorReadingCreate
 from app.schemas.simulator_schema import SimulatorGenerateRequest
 from app.services.classification_service import classify_environment
+from app.services.room_service import ensure_device_room
 
 MAX_SIMULATED_RECORDS = 100_000
 
@@ -104,7 +105,8 @@ def generate_values(moment: datetime, profile: str) -> dict[str, float]:
     }
 
 
-def generate_simulated_readings(db: Session, payload: SimulatorGenerateRequest) -> int:
+def generate_simulated_readings(db: Session, payload: SimulatorGenerateRequest, *, commit: bool = True) -> int:
+    room = ensure_device_room(db, payload.device_id, payload.location, "simulation")
     total = calculate_total_records(
         payload.start_datetime,
         payload.end_datetime,
@@ -118,17 +120,22 @@ def generate_simulated_readings(db: Session, payload: SimulatorGenerateRequest) 
         sensor_payload = SensorReadingCreate(
             device_id=payload.device_id,
             location=payload.location,
+            data_source="simulation",
             **values,
         )
         readings.append(
             SensorReading(
                 **sensor_payload.model_dump(),
-                air_quality_status=classify_environment(sensor_payload),
-                created_at=current,
+                room_id=room.id,
+                air_quality_status=classify_environment(sensor_payload, room),
+                created_at=current.astimezone(timezone.utc) if current.tzinfo else current.replace(tzinfo=timezone.utc),
             )
         )
         current += timedelta(seconds=payload.frequency_seconds)
 
     db.add_all(readings)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return total

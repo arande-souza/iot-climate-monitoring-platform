@@ -1,0 +1,27 @@
+{
+  "result": "passed",
+  "preserved": {
+    "sensor_readings": {
+      "count": 230186,
+      "sha_fingerprint": "842901da76a8136e036c150e52e8a48e"
+    },
+    "rooms": {
+      "count": 2,
+      "sha_fingerprint": "e6027e9fbe58061377e4855f52c39d25"
+    },
+    "cost_scenarios": {
+      "count": 0,
+      "sha_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    }
+  },
+  "checks": [
+    "/health",
+    "/api/readings/history",
+    "/api/readings/alerts",
+    "/api/rooms/overview",
+    "/api/costs/portfolio",
+    "context and scenarios: 130a57b2-c7fc-4a6c-8592-77e1bf8941dc",
+    "context and scenarios: 9897a9cf-d28a-4a8b-bee2-e1648ba775ec"
+  ],
+  "financial_test_data_inserted": false
+}

@@ -1,0 +1,86 @@
+.overview-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 16px; margin: 22px 0; }
+.summary-card, .room-card { background: #fff; border: 1px solid #dfe6ef; border-radius: 14px; box-shadow: 0 3px 12px #10203305; padding: 22px; min-width: 0; }
+.summary-card > span { color: #526173; font-size: .85rem; }
+.summary-card strong { display: block; font-size: 1.85rem; font-weight: 750; margin-top: 10px; color: #102033; }
+.summary-card small { font-size: .85rem; font-weight: 500; }
+.summary-card p { color: #526173; font-size: .8rem; margin-bottom: 0; }
+.room-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 20px; margin-top: 22px; }
+.room-card h3 { margin: 0; font-size: 1.15rem; overflow-wrap: anywhere; }
+.room-card .section-heading { align-items: start; gap: 12px; flex-wrap: wrap; }
+.room-description { min-height: 2.7em; overflow-wrap: anywhere; line-height: 1.5; }
+.room-values { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 24px 0; }
+.room-values span { display: block; font-size: .8rem; color: #526173; margin-bottom: 8px; }
+.room-values strong { font-size: 1.8rem; color: #102033; }
+.room-values small { font-size: .9rem; font-weight: 500; }
+.room-actions { display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid #eef2f6; padding-top: 18px; margin-top: 18px; }
+.room-status { border-radius: 24px; padding: 6px 10px; font-size: .75rem; font-weight: 650; white-space: nowrap; }
+.state-normal { background: #dcfce7; color: #166534; }
+.state-atencao { background: #fef3c7; color: #854d0e; }
+.state-critico { background: #fee2e2; color: #991b1b; }
+.state-sem_dados, .state-desatualizado { background: #e8edf3; color: #475569; }
+.muted { color: #526173; font-size: .9rem; line-height: 1.6; overflow-wrap: anywhere; }
+.source-tag { display: inline-block; background: #eef2ff; border: 1px solid #d8def6; color: #373777; border-radius: 6px; padding: 5px 8px; font-size: .75rem; }
+.source-notice { padding: 13px 16px; border-left: 3px solid #0f766e; background: #e5f3ef; color: #174a40; line-height: 1.6; }
+.reading-source { display: block; margin-top: 4px; color: #526173; font-size: .7rem; }
+.comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+.comparison-grid > * { min-width: 0; }
+.room-chart { height: 240px; width: 100%; display: block; }
+.chart-tooltip { min-height: 3em; font-size: .8rem; line-height: 1.5; color: #526173; }
+.compare-row { display: grid; grid-template-columns: minmax(80px, 1fr) 2fr auto; gap: 14px; align-items: center; margin: 22px 0; font-size: .85rem; }
+.compare-row > span { overflow-wrap: anywhere; }
+.compare-row > strong { white-space: nowrap; }
+.compare-track { height: 14px; border-radius: 4px; background: #edf2f7; position: relative; overflow: hidden; }
+.compare-track > span { position: absolute; top: 0; height: 100%; border-radius: 4px; }
+.empty-state { color: #526173; text-align: center; padding: 36px 18px; border: 1px dashed #bdcadb; border-radius: 12px; background: #f8fafc; grid-column: 1 / -1; }
+.notice { padding: 14px 18px; border: 1px solid #a6d4c8; border-radius: 8px; background: #e5f3ef; color: #174a40; }
+.notice-error { background: #fff1f2; border-color: #f5bec6; color: #991b1b; }
+.form-error { color: #991b1b; line-height: 1.5; }
+.history-data { background: #fff; padding: 18px; border: 1px solid #dfe6ef; border-radius: 12px; margin: 20px 0; }
+.history-data summary { cursor: pointer; color: #0f766e; font-weight: 600; }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible, canvas:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.layout button, #roomDialog button { background: #0f766e; border: 1px solid #0f766e; color: white; border-radius: 8px; padding: 10px 14px; min-height: 42px; font: inherit; font-size: .85rem; cursor: pointer; }
+.layout button.secondary-action, #roomDialog button.secondary-action { background: #fff; border-color: #cbd5e1; color: #244159; }
+.layout button.danger-action { background: #fff; color: #991b1b; border-color: #fecaca; }
+.layout button:disabled, #roomDialog button:disabled { opacity: .55; cursor: default; }
+#roomDialog { width: min(720px, calc(100% - 28px)); max-height: calc(100dvh - 48px); border: 1px solid #cbd5e1; border-radius: 16px; padding: 26px; color: #18212f; box-shadow: 0 24px 80px #10203333; }
+#roomDialog::backdrop { background: #10203399; }
+.room-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+.room-form-grid label { display: grid; gap: 7px; font-size: .85rem; align-content: start; }
+.room-form-grid input, .room-form-grid select, .room-form-grid textarea { font: inherit; width: 100%; min-width: 0; min-height: 42px; border: 1px solid #bac7d7; border-radius: 7px; padding: 10px; color: #18212f; background: #fff; }
+.room-form-grid small { font-size: .75rem; color: #526173; line-height: 1.5; }
+.room-form-grid .wide { grid-column: 1 / -1; }
+.room-form-grid input:read-only { background: #eef2f6; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.topbar-actions { max-width: 100%; }
+.room-control select { width: 100%; }
+.room-control[hidden] { display: none; }
+.section-heading { flex-wrap: wrap; gap: 16px; }
+.section-heading h2 { margin-top: 0; }
+.room-status, .source-tag { line-height: 1.4; }
+.icon { width: 20px; height: 20px; flex: 0 0 20px; display: inline-block; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nav-item { display: flex; align-items: center; gap: 10px; }
+.summary-card > span, .metric-label, .room-values span, .chart-section h2 { display: flex; align-items: center; gap: 8px; }
+.summary-card > span { min-height: 2.5em; }
+.summary-card .icon { color: #0f766e; }
+.room-values span .icon { width: 16px; height: 16px; flex-basis: 16px; }
+.room-location { display: flex; align-items: flex-start; gap: 8px; color: #42556c; line-height: 1.5; font-size: .85rem; overflow-wrap: anywhere; }
+.room-location .icon { color: #0f766e; width: 17px; height: 17px; flex-basis: 17px; margin-top: 2px; }
+.overview-filters, .custom-period { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+.custom-period[hidden] { display: none; }
+.overview-filters .room-control { min-width: 180px; }
+.overview-filters input { min-height: 40px; padding: 8px; border-radius: 8px; border: 1px solid #bac7d7; max-width: 100%; background: #fff; }
+.overview-history { min-width: 0; }
+.overview-history[aria-busy="true"] > .comparison-grid { opacity: .55; }
+.event-legend { display: flex; gap: 20px; font-size: .85rem; }
+.event-legend span:first-child { color: #a16207; }
+.event-legend span:last-child { color: #b91c1c; }
+.overview-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.room-card { transition: box-shadow .15s ease, border-color .15s ease; }
+.room-card:hover { border-color: #a5c9bf; box-shadow: 0 6px 20px #1020330c; }
+.metrics-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 620px) { .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1550px) { .overview-metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .overview-metrics { grid-template-columns: 1fr 1fr; } .overview-filters, .custom-period { align-items: stretch; flex-direction: column; } .overview-filters .room-control { min-width: 0; width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .room-card { transition: none; } }
+@media (max-width: 1100px) { .comparison-grid { grid-template-columns: 1fr; } .topbar { flex-wrap: wrap; } }
+@media (max-width: 620px) { .overview-metrics { grid-template-columns: 1fr 1fr; gap: 10px; } .summary-card, .room-card { padding: 16px; } .summary-card strong { font-size: 1.5rem; } .room-form-grid { grid-template-columns: 1fr; } #roomDialog { padding: 18px; } .compare-row { grid-template-columns: minmax(70px, 1fr) 1fr auto; gap: 8px; } .timestamp { white-space: normal; } }

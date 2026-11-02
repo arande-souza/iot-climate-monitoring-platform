@@ -1,9 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from app.schemas.room_schema import DataSource
 
 
 class SensorReadingBase(BaseModel):
+    data_source: DataSource = "unknown"
     device_id: str = Field(..., min_length=1, max_length=80, examples=["esp32-sala-01"])
     location: str = Field(..., min_length=1, max_length=120, examples=["Sala de TI"])
     temperature: float = Field(..., ge=-40, le=85)
@@ -36,9 +38,15 @@ class SensorReadingCreate(SensorReadingBase):
 
 
 class SensorReadingResponse(SensorReadingBase):
+    room_id: str | None = None
     id: int
     air_quality_status: str
     created_at: datetime
+
+    @field_validator("created_at")
+    @classmethod
+    def normalize_timestamp(cls, value):
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -49,9 +57,19 @@ class EnvironmentStatus(BaseModel):
     recommendations: list[str] = []
 
 
+class SensorDevice(BaseModel):
+    device_id: str
+    location: str
+
+
 class ReadingsDateRange(BaseModel):
     start_datetime: datetime | None = None
     end_datetime: datetime | None = None
+
+    @field_validator("start_datetime", "end_datetime")
+    @classmethod
+    def normalize_timestamp(cls, value):
+        return value.replace(tzinfo=timezone.utc) if value and value.tzinfo is None else value
 
 
 class ReadingsSummary(BaseModel):

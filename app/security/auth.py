@@ -133,7 +133,7 @@ def unauthorized_response() -> JSONResponse:
 
 
 def should_redirect_to_login(path: str) -> bool:
-    return path in {"/", "/dashboard", "/docs", "/openapi.json"} or path.startswith("/static/")
+    return path in {"/", "/dashboard", "/docs", "/openapi.json"} or path.startswith(("/static/", "/rooms/"))
 
 
 async def require_jwt_middleware(request: Request, call_next):

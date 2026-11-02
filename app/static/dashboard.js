@@ -6,6 +6,10 @@ const integerFormat = new Intl.NumberFormat("pt-BR", {
 });
 
 const views = {
+  costsView: { title: "Custos e Investimentos", subtitle: "Cenários de climatização e projeções de energia por sala" },
+  overviewView: { title: "Visão geral", subtitle: "Todos os ambientes em um só lugar" },
+  roomsView: { title: "Gerenciar salas", subtitle: "Cadastro e limites de cada ambiente" },
+  comparisonView: { title: "Comparar ambientes", subtitle: "Médias, extremos e alertas no mesmo período" },
   generalView: {
     title: "Geral",
     subtitle: "Status atual e leituras recentes dos sensores IoT",
@@ -31,13 +35,58 @@ const simulatorUpdateMessage = document.getElementById("simulatorUpdateMessage")
 const logoutButton = document.getElementById("logoutButton");
 let criticalHoursData = [];
 let criticalHoursHoverPoint = null;
-const simulatorUpdatePayload = {
-  device_id: "esp32-sala-01",
-  location: "Santo André - SP",
-  frequency_seconds: 60,
-  profile: "mixed",
-};
-const SIMULATOR_DEFAULT_MESSAGE = "Area de atualização manual";
+const roomSelect = document.getElementById("roomSelect");
+const rooms = new Map();
+let dashboardRequestId = 0;
+let lastFilterRoomId = null;
+let isUpdatingAllRooms = false;
+
+function roomUrl(url) {
+  if (!roomSelect.value) throw new Error("Cadastre ou selecione uma sala para consultar seus dados.");
+  const [path, query = ""] = url.split("?");
+  const params = new URLSearchParams(query);
+  params.set("room_id", rooms.get(roomSelect.value).id);
+  return `${path}?${params.toString()}`;
+}
+
+function syncRoomFilters() {
+  const roomId = rooms.get(roomSelect.value)?.id || null;
+  if (roomId !== lastFilterRoomId) {
+    document.getElementById("readingsDevice").value = "";
+    document.getElementById("alertsDevice").value = "";
+    lastFilterRoomId = roomId;
+  }
+}
+
+async function loadRooms() {
+  const registered = await fetchJson("/api/rooms");
+  const previousRoomId = rooms.get(roomSelect.value)?.id;
+  rooms.clear();
+  registered.forEach((room) => {
+    rooms.set(room.device_id, { ...room, label: room.name });
+  });
+  const selected = roomSelect.value;
+  roomSelect.replaceChildren(...Array.from(rooms, ([deviceId, room]) => {
+    const option = document.createElement("option");
+    option.value = deviceId;
+    option.textContent = `${room.label} (${deviceId})`;
+    return option;
+  }));
+  if (!rooms.size) {
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "Nenhuma sala cadastrada";
+    roomSelect.appendChild(empty);
+  }
+  roomSelect.value = rooms.has(selected) ? selected
+    : registered.find(room => room.id === previousRoomId)?.device_id || rooms.keys().next().value || "";
+  roomSelect.disabled = !rooms.size;
+  updateSimulatedDataButton.disabled = !rooms.size || isUpdatingAllRooms;
+  syncRoomFilters();
+  if (typeof syncOverviewRoomFilter === "function") syncOverviewRoomFilter();
+  return registered;
+}
+const SIMULATOR_DEFAULT_MESSAGE = "Área de atualização manual";
 let simulatorMessageResetTimeout;
 const DASHBOARD_TIME_ZONE = "America/Sao_Paulo";
 const DASHBOARD_TIME_ZONE_OFFSET = "-03:00";
@@ -122,10 +171,12 @@ function getDefaultPeriod() {
 }
 
 async function setDefaultFilters() {
+  if (!roomSelect.value) return;
+  const deviceId = roomSelect.value;
   let { start, end } = getDefaultPeriod();
 
   try {
-    const range = await fetchJson("/api/readings/range");
+    const range = await fetchJson(roomUrl("/api/readings/range"));
     if (range.start_datetime && range.end_datetime) {
       start = new Date(range.start_datetime);
       end = new Date(range.end_datetime);
@@ -134,6 +185,9 @@ async function setDefaultFilters() {
     console.error(error);
   }
 
+  if (deviceId !== roomSelect.value) return;
+  // Inputs have minute precision; include readings in the final partial minute.
+  end = new Date(Math.ceil(end.getTime() / 60000) * 60000);
   ["readingsStart", "alertsStart"].forEach((id) => {
     document.getElementById(id).value = formatDateTimeLocal(start);
   });
@@ -184,12 +238,15 @@ async function postJson(url, payload) {
 }
 
 function buildPeriodUrl(baseUrl, startId, endId, deviceId, pagination, alertTypeId, statusFilterId) {
+  if (!roomSelect.value) throw new Error("Nenhuma sala cadastrada.");
   const start = document.getElementById(startId).value;
   const end = document.getElementById(endId).value;
   const device = document.getElementById(deviceId).value.trim();
   const alertType = alertTypeId ? document.getElementById(alertTypeId).value : "";
   const statusFilter = statusFilterId ? document.getElementById(statusFilterId).value : "";
   const params = new URLSearchParams();
+  params.set("room_id", rooms.get(roomSelect.value).id);
+  if (baseUrl.endsWith("/export")) params.set("include_source", "true");
   if (start) {
     params.set("start", localInputToIso(start));
   }
@@ -245,12 +302,20 @@ function updateMetrics(statusPayload) {
   document.getElementById("recommendations").textContent = statusPayload.recommendations.join(" ");
   setStatusClass(statusPayload.status);
 
-  if (!reading) return;
+  if (!reading) {
+    ["temperature", "humidity", "co2", "pm25", "pressure", "pm10"].forEach((id) => {
+      document.getElementById(id).textContent = "--";
+    });
+    document.getElementById("updatedAt").textContent = "Nenhuma leitura nesta sala";
+    return;
+  }
 
   document.getElementById("temperature").textContent = formatValue(reading.temperature);
   document.getElementById("humidity").textContent = formatValue(reading.humidity);
   document.getElementById("co2").textContent = formatValue(reading.co2);
   document.getElementById("pm25").textContent = formatValue(reading.pm25);
+  document.getElementById("pressure").textContent = formatValue(reading.pressure);
+  document.getElementById("pm10").textContent = formatValue(reading.pm10);
   document.getElementById("updatedAt").textContent = `Atualizado em ${formatDate(reading.created_at)}`;
 }
 
@@ -265,7 +330,8 @@ function renderStatusBadge(status) {
     alert: "alerta",
     critical: "critico",
   }[status] || status;
-  return `<span class="badge ${normalizedStatus}">${normalizedStatus}</span>`;
+  const safeStatus = ["ideal", "aceitavel", "alerta", "critico"].includes(normalizedStatus) ? normalizedStatus : "sem_dados";
+  return `<span class="badge ${safeStatus}">${safeStatus.replace("_", " ")}</span>`;
 }
 
 function renderCompactRows(readings, emptyMessage) {
@@ -276,8 +342,8 @@ function renderCompactRows(readings, emptyMessage) {
   return readings.map((reading) => `
     <tr>
       <td>${formatDate(reading.created_at)}</td>
-      <td>${reading.device_id}</td>
-      <td>${reading.location}</td>
+      <td>${escapeHtml(reading.device_id)}<small class="reading-source">${sourceLabel(reading.data_source)}</small></td>
+      <td>${escapeHtml(reading.location)}</td>
       <td>${formatValue(reading.temperature)} °C</td>
       <td>${formatValue(reading.humidity)}%</td>
       <td>${formatValue(reading.co2)}</td>
@@ -295,8 +361,8 @@ function renderFullRows(readings, emptyMessage, columns) {
   return readings.map((reading) => `
     <tr>
       <td>${formatDate(reading.created_at)}</td>
-      <td>${reading.device_id}</td>
-      <td>${reading.location}</td>
+      <td>${escapeHtml(reading.device_id)}<small class="reading-source">${sourceLabel(reading.data_source)}</small></td>
+      <td>${escapeHtml(reading.location)}</td>
       <td>${formatValue(reading.temperature)} °C</td>
       <td>${formatValue(reading.humidity)}%</td>
       ${columns === 10 ? `<td>${formatValue(reading.pressure)}</td>` : ""}
@@ -566,23 +632,31 @@ function scheduleSimulatorMessageReset() {
 }
 
 async function refreshDashboard() {
+  if (!roomSelect.value) return;
+  const requestId = ++dashboardRequestId;
   try {
     const [statusPayload, latestReadings, summaryPayload] = await Promise.all([
-      fetchJson("/api/readings/status"),
-      fetchJson("/api/readings/latest?limit=20"),
-      fetchJson("/api/readings/summary"),
+      fetchJson(roomUrl("/api/readings/status")),
+      fetchJson(roomUrl("/api/readings/latest?limit=20")),
+      fetchJson(roomUrl("/api/readings/summary")),
     ]);
+    if (requestId !== dashboardRequestId) return;
     updateMetrics(statusPayload);
     updateSummary(summaryPayload);
     updateTable(latestReadings);
     updateChart(latestReadings);
   } catch (error) {
+    if (requestId !== dashboardRequestId) return;
     document.getElementById("updatedAt").textContent = "Falha ao atualizar";
     console.error(error);
   }
 }
 
 async function loadReadingsHistory() {
+  if (!roomSelect.value) {
+    document.getElementById("allReadingsTable").innerHTML = '<tr><td colspan="10">Nenhuma sala cadastrada.</td></tr>';
+    return;
+  }
   const state = paginationState.readings;
   try {
     validateDateRange("readingsStart", "readingsEnd");
@@ -655,6 +729,11 @@ async function exportReadingsReport() {
 }
 
 async function loadAlertsHistory() {
+  if (!roomSelect.value) {
+    document.getElementById("alertsTable").innerHTML = '<tr><td colspan="9">Nenhuma sala cadastrada.</td></tr>';
+    updateCriticalHoursChart([]);
+    return;
+  }
   const state = paginationState.alerts;
   try {
     validateDateRange("alertsStart", "alertsEnd");
@@ -738,8 +817,14 @@ async function exportAlertsReport() {
 }
 
 async function refreshVisibleDataAfterSimulationUpdate() {
+  await loadRooms();
   await setDefaultFilters();
-  await refreshDashboard();
+  await refreshOverview();
+  if (document.getElementById("generalView").classList.contains("active")) {
+    await refreshDashboard();
+    await refreshRoomDetails();
+  }
+  if (document.getElementById("comparisonView").classList.contains("active")) await refreshComparison();
 
   if (document.getElementById("readingsView").classList.contains("active")) {
     paginationState.readings.page = 1;
@@ -752,17 +837,21 @@ async function refreshVisibleDataAfterSimulationUpdate() {
 }
 
 async function updateSimulatedDataUntilNow() {
-  if (updateSimulatedDataButton.disabled) return;
+  if (isUpdatingAllRooms || !rooms.size) return;
+  isUpdatingAllRooms = true;
 
   updateSimulatedDataButton.disabled = true;
   updateSimulatedDataButton.classList.add("is-loading");
   updateSimulatedDataText.textContent = "Atualizando...";
-  setSimulatorUpdateMessage("Gerando novos registros simulados...", "");
+  setSimulatorUpdateMessage("Atualizando os dados de todas as salas...", "");
 
   try {
-    const result = await postJson("/simulator/update-until-now", simulatorUpdatePayload);
+    const result = await postJson("/simulator/update-all-until-now", {
+      frequency_seconds: 60,
+      profile: "mixed",
+    });
     if (result.total_generated > 0) {
-      setSimulatorUpdateMessage("Dados atualizados com sucesso", "success");
+      setSimulatorUpdateMessage(`Dados atualizados: ${result.updated_rooms} de ${result.total_rooms} salas receberam novas leituras.`, "success");
       scheduleSimulatorMessageReset();
     } else {
       setSimulatorUpdateMessage(result.message || SIMULATOR_DEFAULT_MESSAGE, "");
@@ -772,7 +861,8 @@ async function updateSimulatedDataUntilNow() {
     setSimulatorUpdateMessage(`Erro ao atualizar dados: ${error.message}`, "error");
     console.error(error);
   } finally {
-    updateSimulatedDataButton.disabled = false;
+    isUpdatingAllRooms = false;
+    updateSimulatedDataButton.disabled = !rooms.size;
     updateSimulatedDataButton.classList.remove("is-loading");
     updateSimulatedDataText.textContent = "Atualizar dados";
   }
@@ -787,14 +877,37 @@ function switchView(viewId) {
   });
   document.getElementById("pageTitle").textContent = views[viewId].title;
   document.getElementById("pageSubtitle").textContent = views[viewId].subtitle;
+  document.getElementById("headerRoomControl").hidden = viewId === "roomsView";
 
   if (viewId === "generalView") refreshDashboard();
   if (viewId === "readingsView") loadReadingsHistory().catch(console.error);
   if (viewId === "alertsView") loadAlertsHistory().catch(console.error);
+  if (typeof refreshRoomsView === "function") refreshRoomsView(viewId);
 }
 
 document.querySelectorAll(".nav-item").forEach((button) => {
   button.addEventListener("click", () => switchView(button.dataset.view));
+});
+
+roomSelect.addEventListener("change", async () => {
+  const deviceId = roomSelect.value;
+  dashboardRequestId += 1;
+  Object.values(paginationState).forEach((state) => {
+    state.requestId += 1;
+    state.page = 1;
+    state.isLoading = false;
+  });
+  syncRoomFilters();
+  updateMetrics({ status: "sem_dados", latest_reading: null, recommendations: [] });
+  updateSummary({ total_readings: 0 });
+  updateTable([]);
+  updateChart([]);
+  updateCriticalHoursChart([]);
+  document.getElementById("allReadingsTable").replaceChildren();
+  document.getElementById("alertsTable").replaceChildren();
+  await setDefaultFilters();
+  if (deviceId !== roomSelect.value) return;
+  switchView(document.querySelector(".view.active").id === "costsView" ? "costsView" : "generalView");
 });
 
 document.getElementById("applyReadingsFilter").addEventListener("click", () => {
@@ -898,13 +1011,15 @@ async function initializeDashboard() {
     redirectToLogin();
     return;
   }
-  await setDefaultFilters();
-  refreshDashboard();
+  syncRoomFilters();
+  try {
+    await loadRooms();
+    await setDefaultFilters();
+    await refreshDashboard();
+  } catch (error) {
+    document.getElementById("updatedAt").textContent = "Falha ao carregar salas";
+    console.error(error);
+  }
 }
 
-initializeDashboard();
-setInterval(() => {
-  if (document.getElementById("generalView").classList.contains("active")) {
-    refreshDashboard();
-  }
-}, 10000);
+// Startup and periodic refresh are coordinated in rooms.js for all dashboards.

@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Monitoramento Climatico IoT</title>
     <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="/static/rooms.css" />
+    <link rel="stylesheet" href="/static/costs.css" />
   </head>
-  <body>
+  <body data-initial-room-id="{{ initial_room_id | default('') }}">
     <div class="app-shell">
       <aside class="sidebar" aria-label="Menu principal">
         <div class="brand">
@@ -17,9 +19,13 @@
           </div>
         </div>
         <nav class="nav-menu">
-          <button class="nav-item active" type="button" data-view="generalView">Geral</button>
-          <button class="nav-item" type="button" data-view="readingsView">Historico Leituras</button>
-          <button class="nav-item" type="button" data-view="alertsView">Historico Alertas</button>
+          <button class="nav-item active" type="button" data-view="overviewView"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#dashboard"/></svg>Visão geral</button>
+          <button class="nav-item" type="button" data-view="generalView"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#door"/></svg>Detalhes da sala</button>
+          <button class="nav-item" type="button" data-view="comparisonView"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#bars"/></svg>Comparar ambientes</button>
+          <button class="nav-item" type="button" data-view="readingsView"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#chart"/></svg>Historico Leituras</button>
+          <button class="nav-item" type="button" data-view="alertsView"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#bell"/></svg>Historico Alertas</button>
+          <button class="nav-item" type="button" data-view="costsView"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#calculator"/></svg>Custos e Investimentos</button>
+          <button class="nav-item" type="button" data-view="roomsView"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#building"/></svg>Gerenciar salas</button>
         </nav>
         <div class="sidebar-footer">
           <button id="logoutButton" type="button">Sair</button>
@@ -29,48 +35,136 @@
       <div class="content-shell">
         <header class="topbar">
           <div>
-            <h1 id="pageTitle">Geral</h1>
-            <p id="pageSubtitle">Status atual e leituras recentes dos sensores IoT</p>
+            <h1 id="pageTitle">Visão geral</h1>
+            <p id="pageSubtitle">Todos os ambientes em um só lugar</p>
           </div>
           <div class="topbar-actions">
+            <label id="headerRoomControl" class="room-control" for="roomSelect">
+              Sala / dispositivo
+              <select id="roomSelect" aria-label="Selecionar ambiente"><option value="">Carregando salas…</option></select>
+            </label>
             <span id="updatedAt" class="timestamp">Atualizando...</span>
           </div>
         </header>
 
         <main class="layout">
-          <section id="generalView" class="view active">
-            <section class="action-bar" aria-label="Acoes do dashboard">
-              <div>
-                <strong>Coleta de dados</strong>
-                <span id="simulatorUpdateMessage">Area de atualização manual</span>
-              </div>
-              <button id="updateSimulatedData" type="button" aria-label="Atualizar dados">
-                <span class="refresh-icon" aria-hidden="true">↻</span>
-                <span id="updateSimulatedDataText">Atualizar dados</span>
-              </button>
+          <p id="roomNotice" class="notice" role="status" aria-live="polite" hidden></p>
+          <section id="overviewView" class="view active" aria-label="Visão geral dos ambientes">
+            <section class="action-bar" aria-label="Coleta de dados de todas as salas">
+              <div><strong>Coleta de dados</strong><span id="simulatorUpdateMessage">Área de atualização manual</span></div>
+              <button id="updateSimulatedData" type="button" aria-label="Atualizar dados de todas as salas"><span class="refresh-icon" aria-hidden="true">↻</span><span id="updateSimulatedDataText">Atualizar dados</span></button>
             </section>
+            <div class="section-heading"><div><h2>Ambientes monitorados</h2><p class="muted">Acompanhe cada sala e identifique onde agir.</p></div><button type="button" data-action="create-room">+ Nova sala</button></div>
+            <div id="overviewMetrics" class="overview-metrics" aria-live="polite"><p>Carregando indicadores…</p></div>
+            <p id="overviewContext" class="muted"></p>
+            <section class="overview-history" aria-label="Gráficos consolidados dos ambientes">
+              <div class="section-heading"><div><h2>Evolução dos ambientes</h2><p class="muted">Os filtros abaixo se aplicam aos gráficos; o resumo e os cards mostram todas as salas.</p></div></div>
+              <div class="overview-filters">
+                <label class="room-control">Período<select id="overviewPeriod"><option value="1">Últimas 24 horas</option><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="custom">Personalizado</option></select></label>
+                <label class="room-control">Ambiente<select id="overviewRoomFilter"><option value="">Todas as salas</option></select></label>
+                <div id="overviewCustomRange" class="custom-period" hidden><label class="room-control">Início<input id="overviewStart" type="datetime-local" /></label><label class="room-control">Fim<input id="overviewEnd" type="datetime-local" /></label><button id="applyOverviewPeriod" type="button">Aplicar período</button></div>
+              </div>
+              <p id="overviewHistoryContext" class="muted" role="status">Carregando histórico consolidado…</p>
+              <div class="comparison-grid">
+                <section class="chart-section"><h2><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#temperature"/></svg>Temperatura média das salas</h2><canvas id="overviewTemperatureChart" class="room-chart" role="img" aria-label="Temperatura média consolidada; valores na tabela abaixo" tabindex="0"></canvas><p id="overviewTemperatureChartTooltip" class="chart-tooltip" aria-live="polite"></p></section>
+                <section class="chart-section"><h2><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#droplet"/></svg>Umidade média das salas</h2><canvas id="overviewHumidityChart" class="room-chart" role="img" aria-label="Umidade média consolidada; valores na tabela abaixo" tabindex="0"></canvas><p id="overviewHumidityChartTooltip" class="chart-tooltip" aria-live="polite"></p></section>
+              </div>
+              <section class="chart-section"><h2><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#alert"/></svg>Alertas e eventos críticos por período</h2><p class="event-legend"><span>● Alertas</span><span>● Críticos</span></p><canvas id="overviewEventsChart" class="room-chart" role="img" aria-label="Ocorrências de alerta e críticas por intervalo; valores na tabela abaixo" tabindex="0"></canvas><p id="overviewEventsChartTooltip" class="chart-tooltip" aria-live="polite"></p></section>
+              <details class="history-data"><summary>Ver dados consolidados em tabela</summary><div class="table-wrap"><table><thead><tr><th>Data</th><th>Temperatura média</th><th>Umidade média</th><th>Salas com dados</th><th>Leituras</th><th>Alertas</th><th>Críticos</th></tr></thead><tbody id="overviewSeriesTable"><tr><td colspan="7">Carregando histórico…</td></tr></tbody></table></div></details>
+            </section>
+            <div class="section-heading"><h2>Resumo por sala</h2></div>
+            <div id="roomCards" class="room-grid"><p>Carregando ambientes…</p></div>
+          </section>
 
+          <section id="costsView" class="view" aria-label="Custos e Investimentos">
+            <div class="section-heading"><div><h2>Planeje a climatização</h2><p class="muted">Selecione a sala no cabeçalho, informe seus parâmetros e compare alternativas.</p></div><button type="button" id="newCostScenario">+ Novo cenário</button></div>
+            <p class="cost-disclaimer"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#calculator"/></svg><span><strong>Estimativas de consumo e custos.</strong> Estes resultados não são medições elétricas. BTU/h é capacidade de refrigeração; kW é potência elétrica. O histórico ambiental serve apenas como contexto e não determina o consumo do aparelho.</span></p>
+
+            <div class="section-heading"><p class="muted">Projeções e distribuição por sala</p><label class="room-control">Horizonte dos gráficos<select id="costHorizon"><option value="12">12 meses</option><option value="24">24 meses</option><option value="36">36 meses</option></select></label></div>
+            <p id="costNotice" role="status" aria-live="polite" class="muted"></p>
+            <form id="costForm" class="cost-panel">
+              <h2><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#calculator"/></svg>Configuração da simulação</h2><p id="costFormTitle" class="muted">Novo cenário</p><p class="muted">Sala: <strong id="costSelectedRoom">Selecione no cabeçalho</strong>. Preencha os parâmetros para calcular automaticamente; salvar é uma ação separada.</p><input id="costScenarioId" type="hidden" />
+              <div class="room-form-grid">
+                <label>Nome do cenário<input id="costName" required maxlength="120" /></label>
+                <label>Modelo do ar-condicionado<input id="costModel" required maxlength="160" /></label>
+                <label>Capacidade de refrigeração (BTU/h)<input id="costCapacity" type="number" min="1" max="1000000" step="1" required /><small>Não utilizada como potência elétrica no cálculo.</small></label>
+                <label>Método de estimativa<select id="costMethod"><option value="power">Potência elétrica média estimada</option><option value="label">Etiqueta de eficiência: rateio por horas</option></select></label>
+                <label><span id="costPowerLabel">Potência elétrica média estimada (kW)</span><input id="costPower" type="number" min="0.0001" max="1000" step="0.0001" required /><small id="costPowerHelp">Informe uma potência média, não a capacidade em BTU/h. 1 kW = 1.000 W.</small></label>
+                <label>Tarifa de energia (R$/kWh)<input id="costTariff" type="number" min="0" max="1000" step="0.000001" required /><small>Use a tarifa efetiva que deseja considerar, incluindo os encargos aplicáveis.</small></label>
+                <label>Preço do equipamento (R$)<input id="costPrice" type="number" min="0" max="1000000000" step="0.01" required /></label>
+                <label>Custo de instalação (R$)<input id="costInstallation" type="number" min="0" max="1000000000" step="0.01" required /></label>
+                <label>Manutenção por ocorrência (R$, opcional)<input id="costMaintenance" type="number" min="0" max="1000000000" step="0.01" /><small>Deixe vazio se não houver estimativa.</small></label><label>Intervalo da manutenção (meses)<input id="costMaintenanceInterval" type="number" min="1" max="120" step="1" /><small>Primeira ocorrência ao fim deste intervalo.</small></label><label>Horas de uso por dia<input id="costHours" type="number" min="0" max="24" step="0.01" required /></label>
+                <label>Dias de funcionamento por mês<input id="costDays" type="number" min="0" max="31" step="1" required /></label>
+              </div>
+              <fieldset id="costLabelFields" hidden disabled><legend>Referência da etiqueta de eficiência</legend><p class="muted">Transcreva o consumo e as horas de referência do mesmo período da etiqueta ou documentação. Sem conhecer as horas de referência, use o método por potência média. O rateio abaixo é uma aproximação linear, não uma reprodução do ensaio sazonal.</p><div class="room-form-grid">
+                <label>Consumo declarado (kWh no período)<input id="costLabelEnergy" type="number" min="0.0001" max="10000000" step="0.0001" required /></label>
+                <label>Período da etiqueta<select id="costLabelPeriod" required><option value="">Selecione o período</option><option value="year">Anual (kWh/ano)</option><option value="month">Mensal (kWh/mês)</option></select></label>
+                <label>Horas de referência nesse período<input id="costLabelHours" type="number" min="0.01" max="8784" step="0.01" required /></label>
+              </div></fieldset>
+              <div class="room-form-grid"><label class="wide">Fonte dos parâmetros e condições da etiqueta<textarea id="costSource" maxlength="1000" rows="2" placeholder="Informe de onde vieram os valores: orçamento, ficha técnica, etiqueta, fatura…"></textarea></label><label class="wide">Observações<textarea id="costNotes" maxlength="2000" rows="2"></textarea></label></div>
+              <p id="costFormError" class="form-error" role="alert"></p>
+              <div class="room-actions"><button type="submit" id="calculateCost">Calcular estimativa</button><button type="button" id="saveCostScenario" class="secondary-action">Salvar cenário</button><button type="button" id="cancelCostEdit" class="secondary-action">Limpar formulário</button></div>
+            </form>
+            <section id="costResults" class="cost-panel" hidden aria-live="polite"><div class="section-heading"><h2><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#wallet"/></svg>Resumo financeiro</h2><label class="room-control">Cenário do resumo<select id="costSummaryScenario"><option value="">Selecione um cenário salvo</option></select></label></div><p id="costSummaryContext" class="muted"></p><div id="costResultMetrics" class="overview-metrics"></div><div class="table-wrap"><table><caption>Energia e investimento por horizonte, com parâmetros constantes</caption><thead><tr><th>Horizonte</th><th>Energia acumulada</th><th>Manutenção</th><th>Total com investimento</th></tr></thead><tbody id="costProjectionTable"></tbody></table></div><p id="costCalculationMethod" class="muted"></p></section>
+            <section id="costChartsPanel" hidden><div class="section-heading"><h2 id="costChartTitle">Projeções estimadas</h2></div><p id="costComparisonContext" class="muted"></p><div class="comparison-grid"><section class="chart-section"><h2>Custo mensal de energia</h2><canvas id="costMonthlyChart" class="room-chart" role="img" tabindex="0" aria-label="Custos mensais estimados, valores na tabela abaixo"></canvas><p id="costMonthlyChartTooltip" class="chart-tooltip" aria-live="polite"></p></section><section class="chart-section"><h2>Custo acumulado com investimento</h2><canvas id="costCumulativeChart" class="room-chart" role="img" tabindex="0" aria-label="Custos acumulados estimados, valores na tabela abaixo"></canvas><p id="costCumulativeChartTooltip" class="chart-tooltip" aria-live="polite"></p></section></div><div id="costChartLegend" class="cost-legend"></div><details class="history-data"><summary>Ver projeções mensais em tabela</summary><div class="table-wrap"><table><thead id="costTimelineHeader"></thead><tbody id="costTimelineTable"></tbody></table></div></details></section>
+            <section id="costComposition" class="cost-panel"><h2>Investimento e custos operacionais</h2><p class="muted">Calcule um cenário para visualizar a composição dos custos.</p></section>
+            <section class="cost-panel"><div class="section-heading"><h2><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#bars"/></svg>Comparação de cenários</h2></div><p class="muted">Marque dois cenários para comparar equipamentos ou regimes de uso. Para exportar, selecione um ou dois.</p><div class="table-wrap"><table><thead><tr><th>Selecionar</th><th>Cenário / equipamento</th><th>Consumo mensal</th><th>Custo mensal</th><th>Investimento</th><th>Ações</th></tr></thead><tbody id="costScenarioTable"><tr><td colspan="6">Nenhum cenário carregado.</td></tr></tbody></table></div><div class="room-form-grid"><label>Tarifas na comparação<select id="costTariffMode"><option value="shared">Mesma tarifa para os dois cenários</option><option value="scenario">Usar explicitamente a tarifa de cada cenário</option></select></label><label>Tarifa comum (R$/kWh, opcional)<input id="costCommonTariff" type="number" min="0" max="1000" step="0.000001" /><small>Vazio: utiliza a tarifa do primeiro cenário selecionado.</small></label></div><p id="costWinner" class="cost-disclaimer" role="status">Selecione dois cenários para identificar o menor custo projetado.</p><div class="table-wrap"><table><caption>Parâmetros e resultados das alternativas selecionadas</caption><thead id="costCompareHeader"></thead><tbody id="costCompareTable"></tbody></table></div><div class="room-actions"><button type="button" id="compareCosts" disabled>Comparar selecionados</button></div></section>
+            <section class="cost-panel"><h2><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#building"/></svg>Distribuição dos custos por sala</h2><p class="muted">Selecione uma alternativa por sala. Cenários concorrentes não são somados. O horizonte é o mesmo dos gráficos financeiros.</p><div id="costPortfolioOptions" class="room-form-grid"></div><div id="costPortfolioChart"></div></section>
+            <section class="cost-panel" aria-label="Indicadores ambientais"><div class="section-heading"><h2><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#temperature"/></svg>Indicadores ambientais da sala</h2><label class="room-control">Período ambiental<select id="costClimateDays"><option value="1">Últimas 24 horas</option><option value="7" selected>Últimos 7 dias</option><option value="30">Últimos 30 dias</option></select></label></div><p id="costClimateContext" class="muted">Selecione uma sala.</p><div id="costClimateMetrics" class="overview-metrics"></div><p id="costClimateCoverage" class="muted"></p><details><summary>Como os indicadores são calculados</summary><p id="costClimateMethod" class="muted"></p></details><button type="button" class="secondary-action" data-action="cost-room-details">Consultar dados climáticos completos</button></section>
+            <section class="cost-panel"><h2><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#chart"/></svg>Análise do Investimento</h2><p id="costAnalysis" aria-live="polite">Preencha os parâmetros ou abra um cenário salvo para consultar a análise.</p></section>
+            <section class="cost-panel"><h2><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#chart"/></svg>Exportação do relatório</h2><p class="muted">Salve o cenário antes de exportar. O relatório reúne parâmetros, dados ambientais, projeções, gráficos e limitações. O CSV mantém os dados em formato de planilha.</p><div class="room-actions"><button id="printCostReport" type="button" disabled>Relatório / Salvar PDF</button><button id="exportCurrentCost" class="secondary-action" type="button" disabled>CSV do cenário atual</button><button id="exportCostSelection" class="secondary-action" type="button" disabled>CSV dos selecionados</button></div></section>
+            <details class="history-data"><summary>Fórmulas e limites das estimativas</summary><div id="costMethodology"><p>Potência média (kW) × horas/dia × dias/mês = consumo mensal estimado (kWh).</p><p>Consumo mensal × tarifa = custo mensal. Custo mensal × 12 = custo anual de energia.</p><p>Preço + instalação = investimento inicial. Investimento + energia acumulada + manutenção prevista informada = custo total.</p><p>Tarifa e uso constantes. Inclui manutenção apenas quando informada. Não inclui financiamento, inflação ou custos não informados. Não dimensiona a capacidade necessária do equipamento e não garante consumo ou economia.</p><p><a href="https://www.gov.br/inmetro/pt-br/assuntos/regulamentacao/avaliacao-da-conformidade/programa-brasileiro-de-etiquetagem/tabelas-de-eficiencia-energetica/condicionadores-de-ar/nova-etiqueta" target="_blank" rel="noopener noreferrer">Referência: etiqueta de condicionadores de ar — Inmetro</a></p></div></details>
+          </section>
+
+          <section id="roomsView" class="view" aria-label="Gerenciamento de salas">
+            <div class="section-heading"><div><h2>Suas salas</h2><p class="muted">Nomes, origens dos dados e limites de cada ambiente.</p></div><button type="button" data-action="create-room">+ Nova sala</button></div>
+            <div id="roomManagement" class="room-grid"><p>Carregando salas…</p></div>
+          </section>
+
+          <section id="comparisonView" class="view" aria-label="Comparação entre salas">
+            <div class="section-heading"><h2>Comparar ambientes</h2><label class="room-control">Período<select id="comparisonPeriod"><option value="1">Últimas 24 horas</option><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option></select></label></div>
+            <p id="comparisonContext" class="muted"></p>
+            <div id="comparisonCharts" class="comparison-grid"></div>
+            <section class="table-section"><h2>Estatísticas por sala</h2><div class="table-wrap"><table><caption class="sr-only">Médias e extremos no período selecionado</caption><thead><tr><th>Sala</th><th>Origem das leituras</th><th>Temp. média</th><th>Temp. mín.</th><th>Temp. máx.</th><th>Umid. média</th><th>Alertas</th><th>Leituras</th></tr></thead><tbody id="comparisonTable"><tr><td colspan="8">Carregando comparação…</td></tr></tbody></table></div></section>
+          </section>
+
+          <section id="generalView" class="view">
+            <div class="section-heading"><div><button type="button" class="secondary-action" data-action="back-overview">← Visão geral</button><h2 id="roomName">Selecione uma sala</h2><p id="roomDescription" class="muted"></p></div><button type="button" id="editSelectedRoom">Editar sala</button></div>
+            <div class="room-actions"><button type="button" data-action="room-costs" class="secondary-action"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#calculator"/></svg>Custos e Investimentos desta sala</button></div>
+            <p id="roomSource" class="source-notice"></p>
+            <p id="roomLocation" class="room-location"></p>
+            <div class="section-heading"><p id="roomLimits" class="muted"></p><label class="room-control">Período<select id="detailPeriod"><option value="1">Últimas 24 horas</option><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option></select></label></div>
+            <div id="roomStatistics" class="overview-metrics"></div>
+            <div class="comparison-grid">
+              <section class="chart-section"><h2>Temperatura no período</h2><canvas id="roomTemperatureChart" class="room-chart" role="img" aria-label="Histórico de temperatura; valores na tabela abaixo" tabindex="0"></canvas><p id="roomTemperatureChartTooltip" class="chart-tooltip" aria-live="polite"></p></section>
+              <section class="chart-section"><h2>Umidade no período</h2><canvas id="roomHumidityChart" class="room-chart" role="img" aria-label="Histórico de umidade; valores na tabela abaixo" tabindex="0"></canvas><p id="roomHumidityChartTooltip" class="chart-tooltip" aria-live="polite"></p></section>
+            </div>
+            <p id="roomHistoryContext" class="muted"></p>
+            <details class="history-data"><summary>Ver valores dos gráficos em tabela</summary><div class="table-wrap"><table><thead><tr><th>Data</th><th>Temperatura média</th><th>Umidade média</th><th>Leituras no intervalo</th></tr></thead><tbody id="roomSeriesTable"></tbody></table></div></details>
+            <section class="table-section"><div class="section-heading"><h2>Alertas recentes no período</h2><button type="button" data-action="room-alerts">Ver histórico completo</button></div><div class="table-wrap"><table><thead><tr><th>Data</th><th>Status</th><th>Temperatura</th><th>Umidade</th><th>Origem</th></tr></thead><tbody id="roomAlertsTable"></tbody></table></div></section>
             <section class="metrics-grid" aria-label="Metricas atuais">
               <article class="metric">
-                <span class="metric-label">Temperatura</span>
+                <span class="metric-label"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#temperature"/></svg>Temperatura</span>
                 <strong id="temperature">--</strong>
                 <small>°C</small>
               </article>
               <article class="metric">
-                <span class="metric-label">Umidade</span>
+                <span class="metric-label"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#droplet"/></svg>Umidade</span>
                 <strong id="humidity">--</strong>
                 <small>%</small>
               </article>
               <article class="metric">
-                <span class="metric-label">CO2</span>
+                <span class="metric-label"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#air"/></svg>CO₂</span>
                 <strong id="co2">--</strong>
                 <small>ppm</small>
               </article>
               <article class="metric">
-                <span class="metric-label">PM2.5</span>
+                <span class="metric-label"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#particles"/></svg>PM2.5</span>
                 <strong id="pm25">--</strong>
                 <small>ug/m3</small>
               </article>
+              <article class="metric"><span class="metric-label"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#pressure"/></svg>Pressão</span><strong id="pressure">--</strong><small>hPa</small></article>
+              <article class="metric"><span class="metric-label"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#particles"/></svg>PM10</span><strong id="pm10">--</strong><small>µg/m³</small></article>
               <article class="metric">
                 <span class="metric-label">Dados coletados</span>
                 <strong id="totalReadings">--</strong>
@@ -129,7 +223,7 @@
               </label>
               <label>
                 Dispositivo
-                <input id="readingsDevice" type="text" placeholder="Todos" />
+                <input id="readingsDevice" type="text" placeholder="Todos os dispositivos da sala" aria-label="Filtrar dispositivo da sala selecionada" />
               </label>
               <label>
                 Status
@@ -207,7 +301,7 @@
               </label>
               <label>
                 Dispositivo
-                <input id="alertsDevice" type="text" placeholder="Todos" />
+                <input id="alertsDevice" type="text" placeholder="Todos os dispositivos da sala" aria-label="Filtrar dispositivo da sala selecionada" />
               </label>
               <label>
                 Tipo de alerta
@@ -281,6 +375,34 @@
       </div>
     </div>
 
+    <dialog id="roomDialog" aria-labelledby="roomDialogTitle">
+      <form id="roomForm">
+        <div class="section-heading"><h2 id="roomDialogTitle">Nova sala</h2><button type="button" class="secondary-action" id="closeRoomDialog" aria-label="Fechar formulário">✕</button></div>
+        <input id="roomFormId" type="hidden" />
+        <div class="room-form-grid">
+          <label>Nome<input id="roomFormName" required maxlength="120" placeholder="Ex.: Laboratório de redes" /></label>
+          <label>Identificação / número do ambiente<input id="roomFormIdentifier" maxlength="80" placeholder="Ex.: 101, EST-02" /></label>
+          <label>Cidade da empresa<input id="roomFormCity" maxlength="120" placeholder="Ex.: Santo André" /></label>
+          <label>Estado (UF)<input id="roomFormState" maxlength="2" pattern="[a-zA-Z]{2}" placeholder="Ex.: SP" /></label>
+          <label class="wide">Localização interna<input id="roomFormInternalLocation" maxlength="120" placeholder="Ex.: Estoque, sala de equipamentos, escritório" /></label>
+          <label class="wide">Localização de referência<input id="roomFormLocation" required maxlength="120" placeholder="Descrição livre da localização" /><small>Preserva a referência já cadastrada. A localização geográfica e a identificação interna são informadas nos campos acima.</small></label>
+          <label class="wide">Descrição<textarea id="roomFormDescription" maxlength="1000" rows="2"></textarea></label>
+          <label>Dispositivo associado<input id="roomFormDevice" required maxlength="80" pattern="[a-zA-Z0-9_.:\-]+" placeholder="Ex.: esp32-laboratorio" /><small>Exclusivo da sala. A troca preserva as medições e os dispositivos registrados no histórico.</small></label>
+          <label>Origem configurada<select id="roomFormSource"><option value="simulation">Atualização manual</option><option value="sensor">Sensor IoT</option><option value="external_api">API meteorológica externa</option><option value="unknown">Não identificada</option></select></label>
+          <label>Temperatura mínima (°C)<input id="roomFormTempMin" type="number" step="0.1" min="-40" max="85" value="20" required /></label>
+          <label>Temperatura máxima (°C)<input id="roomFormTempMax" type="number" step="0.1" min="-40" max="85" value="26" required /></label>
+          <label>Umidade mínima (%)<input id="roomFormHumidityMin" type="number" step="0.1" min="0" max="100" value="30" required /></label>
+          <label>Umidade máxima (%)<input id="roomFormHumidityMax" type="number" step="0.1" min="0" max="100" value="65" required /></label>
+          <label class="wide">URL de referência da API externa (opcional)<input id="roomFormApiUrl" type="url" placeholder="https://…" /><small>Referência meteorológica externa. Não representa medição interna. A coleta automática de APIs externas não está habilitada; envie leituras pela API do projeto.</small></label>
+          <label class="wide">Observações sobre a origem<textarea id="roomFormNotes" maxlength="500" rows="2"></textarea></label>
+        </div>
+        <p class="muted">Sensores MQTT usam o broker e o tópico já configurados na aplicação. Alterar a origem da sala não modifica a origem das leituras já registradas.</p>
+        <p id="roomFormError" class="form-error" role="alert"></p>
+        <button id="saveRoomButton" type="submit">Salvar sala</button>
+      </form>
+    </dialog>
     <script src="/static/dashboard.js"></script>
+    <script src="/static/rooms.js?v=20261030-esp32"></script>
+    <script src="/static/costs.js"></script>
   </body>
 </html>

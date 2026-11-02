@@ -1,0 +1,27 @@
+{
+  "result": "passed",
+  "database": "PostgreSQL local",
+  "preserved_readings": 229947,
+  "readings_linked_to_rooms": 229947,
+  "confirmed_simulated_batch": 229946,
+  "rooms": [
+    {
+      "name": "Sala 1",
+      "device_id": "esp32-sala-01"
+    },
+    {
+      "name": "Sala 2",
+      "device_id": "esp32-sala-02"
+    }
+  ],
+  "sources": {
+    "simulation": 229946,
+    "unknown": 1
+  },
+  "validated_endpoints": [
+    "overview",
+    "comparison 30 days",
+    "individual dashboard 30 days"
+  ],
+  "backup": "backups/iot_before_rooms_20261028.dump"
+}

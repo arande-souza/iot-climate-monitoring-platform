@@ -42,10 +42,16 @@ def classify_pm25(value: float) -> str:
     return "ideal"
 
 
-def classify_environment(reading: SensorReadingCreate) -> str:
+def classify_environment(reading: SensorReadingCreate, room=None) -> str:
     statuses = [
-        classify_temperature(reading.temperature),
-        classify_humidity(reading.humidity),
+        classify_temperature(reading.temperature) if room is None else (
+            "alerta" if not room.temperature_min <= reading.temperature <= room.temperature_max
+            else "ideal" if 22 <= reading.temperature <= 24 else "aceitavel"
+        ),
+        classify_humidity(reading.humidity) if room is None else (
+            "alerta" if not room.humidity_min <= reading.humidity <= room.humidity_max
+            else "ideal" if 40 <= reading.humidity <= 60 else "aceitavel"
+        ),
         classify_co2(reading.co2),
         classify_pm25(reading.pm25),
     ]
